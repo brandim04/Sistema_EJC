@@ -158,7 +158,8 @@ const produtosFiltrados = computed(() => {
 
 const pessoasFiltradas = computed(() => {
   const termo = buscaPessoa.value.toLowerCase().trim()
-  if (!termo) return pessoas.value
+
+  if (termo.length < 2) return []
 
   return pessoas.value.filter((pessoa) =>
     pessoa.nome?.toLowerCase().includes(termo) ||
@@ -375,17 +376,21 @@ async function finalizarVenda() {
 
   finalizando.value = true
 
+  const { data: usuario } = await supabase.auth.getUser()
   const { data: venda, error: erroVenda } = await supabase
     .from('vendas')
     .insert({
-      pessoa_id: pessoaSelecionada.value.id,
-      status_pagamento: statusPagamento.value,
-      forma_pagamento: statusPagamento.value === 'Pago' ? formaPagamento.value : null,
-      valor_total: totalCarrinho.value,
-      observacao: observacao.value || null
-    })
-    .select()
-    .single()
+    pessoa_id: pessoaSelecionada.value.id,
+    usuario_id: usuario.user.id,
+    status_pagamento: statusPagamento.value,
+    forma_pagamento: statusPagamento.value === 'Pago'
+      ? formaPagamento.value
+      : null,
+    valor_total: totalCarrinho.value,
+    observacao: observacao.value || null
+  })
+  .select()
+  .single()
 
   if (erroVenda) {
     console.error(erroVenda)
@@ -574,9 +579,10 @@ onMounted(() => {
   <h3>Pessoa</h3>
 
   <input
-    v-model="buscaPessoa"
-    placeholder="Buscar nome ou telefone"
-  />
+  v-model="buscaPessoa"
+  placeholder="Buscar nome ou telefone"
+  @input="pessoaSelecionada = null"
+/>
 
   <div
     v-if="pessoaSelecionada"
@@ -595,8 +601,8 @@ onMounted(() => {
   </div>
 
   <div
-  v-if="buscaPessoa.trim()"
-  class="lista-pessoas"
+    v-if="pessoasFiltradas.length && !pessoaSelecionada"
+    class="lista-pessoas"
 >
   <button
     v-for="pessoa in pessoasFiltradas.slice(0,5)"
@@ -746,6 +752,7 @@ onMounted(() => {
 
         <div class="modal-list">
           <button
+            v-if="!pessoaSelecionada"
             v-for="pessoa in pessoasFiltradas"
             :key="pessoa.id"
             class="list-item"

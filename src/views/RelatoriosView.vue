@@ -60,28 +60,32 @@ async function carregarDados() {
 
   const { data: vendasData, error: erroVendas } = await supabase
     .from('vendas')
-    .select(`
-      *,
-      pessoas (
-        id,
-        nome,
-        telefone,
-        tipo,
-        saldo_pendente,
-        circulos(nome),
-        equipes(nome)
-      ),
-      itens_venda (
-        id,
-        quantidade,
-        preco_unitario,
-        subtotal,
-        produtos (
-          id,
-          nome
-        )
-      )
-    `)
+.select(`
+  *,
+  pessoas (
+    id,
+    nome,
+    telefone,
+    tipo,
+    saldo_pendente,
+    circulos(nome),
+    equipes(nome)
+  ),
+  usuarios (
+    id,
+    nome
+  ),
+  itens_venda (
+    id,
+    quantidade,
+    preco_unitario,
+    subtotal,
+    produtos (
+      id,
+      nome
+    )
+  )
+`)
     .order('created_at', { ascending: false })
 
   if (erroVendas) {
@@ -635,39 +639,52 @@ onMounted(() => {
 
         <div class="lista-vendas">
           <div
-            v-for="venda in vendasDaPessoaSelecionada"
-            :key="venda.id"
-            class="venda-card"
-          >
-            <div class="venda-top">
-              <strong>{{ formatarData(venda.created_at) }}</strong>
+  v-for="venda in vendasDaPessoaSelecionada"
+  :key="venda.id"
+  class="venda-card"
+>
+  <div class="venda-top">
+  <strong>
+    {{ formatarData(venda.created_at) }}
+    <span class="venda-vendedor">
+      • {{ venda.usuarios?.nome || 'Não informado' }}
+    </span>
+  </strong>
 
-              <span
-                class="badge"
-                :class="venda.status_pagamento === 'Pago' ? 'pago' : 'pendente'"
-              >
-                {{ venda.status_pagamento }}
-              </span>
-            </div>
+  <span
+    class="badge"
+    :class="venda.status_pagamento === 'Pago' ? 'pago' : 'pendente'"
+  >
+    {{ venda.status_pagamento }}
+  </span>
+</div>
 
-            <div
-              v-for="item in venda.itens_venda"
-              :key="item.id"
-              class="item-venda"
-            >
-              <span>
-                {{ item.quantidade }}x
-                {{ item.produtos?.nome || 'Produto' }}
-              </span>
+<div
+  v-if="venda.observacao"
+  class="venda-observacao"
+>
+  <strong>Observação:</strong>
+  {{ venda.observacao }}
+</div>
 
-              <strong>{{ formatarMoeda(item.subtotal) }}</strong>
-            </div>
+  <div
+    v-for="item in venda.itens_venda"
+    :key="item.id"
+    class="item-venda"
+  >
+    <span>
+      {{ item.quantidade }}x
+      {{ item.produtos?.nome || 'Produto' }}
+    </span>
 
-            <div class="venda-total">
-              <span>Total da venda</span>
-              <strong>{{ formatarMoeda(venda.valor_total) }}</strong>
-            </div>
-          </div>
+    <strong>{{ formatarMoeda(item.subtotal) }}</strong>
+  </div>
+
+  <div class="venda-total">
+    <span>Total da venda</span>
+    <strong>{{ formatarMoeda(venda.valor_total) }}</strong>
+  </div>
+</div>
 
           <p
             v-if="vendasDaPessoaSelecionada.length === 0"
@@ -749,15 +766,17 @@ onMounted(() => {
       </div>
 
       <div class="field">
-        <label>Valor pago</label>
+        <label for="valorPagamento">
+          Valor pago
+        </label>
 
-        <p>Valor: {{ formPagamento.valor }}</p>
-
-<input
-  v-model="formPagamento.valor"
-  type="number"
-  step="0.01"
-/>
+        <input
+          id="valorPagamento"
+          v-model="formPagamento.valor"
+          type="number"
+          step="0.01"
+          min="0.01"
+        />
       </div>
 
       <div class="field">
@@ -775,9 +794,9 @@ onMounted(() => {
         <label>Observação</label>
 
         <textarea
-          v-model="formPagamento.observacao"
-          placeholder="Opcional"
-        ></textarea>
+  v-model="formPagamento.observacao"
+  placeholder="Ex.: Pagamento realizado em dinheiro."
+></textarea>
       </div>
 
       <button
@@ -1161,6 +1180,13 @@ onMounted(() => {
   margin-bottom: 8px;
 }
 
+.venda-vendedor {
+  font-weight: 500;
+  color: #6b7280;
+  font-size: 0.9rem;
+  margin-left: 8px;
+}
+
 .badge {
   padding: 6px 12px;
   border-radius: 999px;
@@ -1221,39 +1247,98 @@ onMounted(() => {
   margin-top: 20px;
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+.field{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:20px;
 }
 
-.field label {
-  font-weight: 600;
-  color: #0b3558;
+.field label{
+    font-size:14px;
+    font-weight:600;
+    color:#234c70;
 }
 
-.saldo-info {
-  background: #eef6fb;
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 18px;
+.field input,
+.field select,
+.field textarea{
+    width:100%;
+    padding:12px 14px;
+
+    border:1px solid #d8e2ec;
+    border-radius:10px;
+
+    font-size:15px;
+    font-family:inherit;
+    background:#fff;
+    color:#0b3558;
+
+    transition:.2s;
+    box-sizing:border-box;
 }
 
-.saldo-info span {
-  display: block;
-  color: #5c7285;
-  margin-bottom: 6px;
+.field textarea{
+    min-height:90px;
+    resize:vertical;
 }
 
-.saldo-info strong {
-  font-size: 22px;
-  color: #0b3558;
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+    outline:none;
+    border-color:#4b8eb8;
+    box-shadow:0 0 0 3px rgba(75,142,184,.15);
 }
 
-.btn-finalizar {
-  width: 100%;
-  padding: 14px;
+.saldo-info{
+    margin:22px 0 26px;
+    padding:18px 20px;
+
+    background:#edf5fb;
+    border-left:5px solid #4b8eb8;
+    border-radius:14px;
+}
+
+.saldo-info span{
+    display:block;
+    color:#5f7386;
+    font-size:13px;
+    margin-bottom:6px;
+}
+
+.saldo-info strong{
+    display:block;
+    font-size:30px;
+    color:#0b3558;
+    font-weight:700;
+}
+
+.btn-finalizar{
+    width:100%;
+    height:48px;
+    margin-top:10px;
+
+    border:none;
+    border-radius:12px;
+
+    background:#4b8eb8;
+    color:#fff;
+
+    font-size:15px;
+    font-weight:700;
+
+    cursor:pointer;
+    transition:.2s;
+}
+
+.btn-finalizar:hover:not(:disabled){
+    background:#3a7da6;
+}
+
+.btn-finalizar:disabled{
+    opacity:.7;
+    cursor:not-allowed;
 }
 
 .btn-finalizar:disabled {
@@ -1309,6 +1394,20 @@ onMounted(() => {
 .filtros .ativo{
   background:#2563eb;
   color:white;
+}
+
+.venda-observacao {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-left: 4px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.venda-observacao strong {
+  color: #1e293b;
 }
 
 .sem-registros{
