@@ -56,6 +56,12 @@ const menu = [
     ]
   }
 ]
+
+function fecharNoMobile() {
+  if (window.innerWidth <= 768 && layout.sidebarOpen) {
+    layout.toggleSidebar()
+  }
+}
 </script>
 
 <template>
@@ -88,6 +94,7 @@ const menu = [
   :to="item.rota"
   class="link"
   :class="{ active: route.path === item.rota }"
+  @click="fecharNoMobile"
 >
   {{ item.nome }}
 </RouterLink>
