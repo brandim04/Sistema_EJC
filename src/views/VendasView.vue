@@ -1,6 +1,5 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import QRCode from 'qrcode'
 import { supabase } from '../lib/supabase'
 import { useToast } from 'vue-toastification'
 
@@ -312,37 +311,6 @@ function calcularTroco() {
   trocoCalculado.value = recebido - totalCarrinho.value
 }
 
-function gerarPixCopiaCola() {
-  if (chavePix === 'COLOQUE_A_CHAVE_PIX_AQUI') {
-    aviso('Coloque a chave Pix no código antes de gerar o QR Code')
-    return ''
-  }
-
-  const valor = totalCarrinho.value.toFixed(2)
-
-  return `PIX EJC PNSG | Chave: ${chavePix} | Valor: R$ ${valor}`
-}
-
-async function gerarQrCodePix() {
-  if (totalCarrinho.value <= 0) {
-    aviso('Adicione produtos ao carrinho')
-    return
-  }
-
-  const textoPix = gerarPixCopiaCola()
-
-  if (!textoPix) return
-
-  pixCopiaCola.value = textoPix
-  qrCodeUrl.value = await QRCode.toDataURL(textoPix)
-  modalPixAberto.value = true
-}
-
-async function copiarPix() {
-  await navigator.clipboard.writeText(pixCopiaCola.value)
-  sucesso('Pix copia e cola copiado')
-}
-
 function limparVenda() {
   carrinho.value = []
   pessoaSelecionada.value = null
@@ -648,15 +616,6 @@ onMounted(() => {
               />
               <span>Pix</span>
             </label>
-
-            <div v-if="formaPagamento === 'Pix'" class="optional-box">
-              <button
-                class="btn-secondary"
-                @click="gerarQrCodePix"
-              >
-                Gerar QR Code Pix
-              </button>
-            </div>
 
             <label class="radio-option">
               <input
