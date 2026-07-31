@@ -23,6 +23,8 @@ function aviso(msg) {
 
 const pessoas = ref([])
 const produtos = ref([])
+const equipesBanco = ref([])
+const circulosBanco = ref([])
 
 const buscaProduto = ref('')
 const buscaPessoa = ref('')
@@ -85,11 +87,11 @@ async function carregarDados() {
   const { data: pessoasData, error: erroPessoas } = await supabase
   .from('pessoas')
   .select(`
-    *,
-    circulos(nome),
-    equipes(nome)
+    nome,
+    tipo,
+    circulo_id,
+    equipe_id
   `)
-  .order('nome')
 
   if (erroPessoas) {
     console.error(erroPessoas)
@@ -98,6 +100,34 @@ async function carregarDados() {
   }
 
   pessoas.value = pessoasData || []
+
+
+const { data: usuario } = await supabase.auth.getUser()
+
+
+const { data: equipesData, error: erroEquipes } = await supabase
+  .from('equipes')
+  .select('id, nome')
+  .order('nome')
+
+
+if (erroEquipes) {
+  console.error(erroEquipes)
+} else {
+  equipesBanco.value = equipesData || []
+}
+
+const { data: circulosData, error: erroCirculos } = await supabase
+  .from('circulos')
+  .select('id, nome')
+  .order('nome')
+
+
+if (erroCirculos) {
+  console.error(erroCirculos)
+} else {
+  circulosBanco.value = circulosData || []
+}
 
   const { data: produtosData, error: erroProdutos } = await supabase
     .from('produtos')
@@ -209,22 +239,32 @@ async function salvarPessoa() {
     return
   }
 
-  if (formPessoa.value.tipo === 'Jovem' && !formPessoa.value.circulo) {
+  if (formPessoa.value.tipo === 'Jovem' && !formPessoa.value.circulo_id){
     aviso('Selecione o círculo do jovem')
     return
   }
 
-  if (formPessoa.value.tipo === 'Servo' && !formPessoa.value.equipe) {
+  if (formPessoa.value.tipo === 'Servo' && !formPessoa.value.equipe_id) {
     aviso('Selecione a equipe do servo')
     return
   }
 
   const payload = {
-    nome: formPessoa.value.nome,
+    nome: formPessoa.value.nome.trim(),
     telefone: formPessoa.value.telefone,
     tipo: formPessoa.value.tipo,
-    circulo: formPessoa.value.tipo === 'Jovem' ? formPessoa.value.circulo : null,
-    equipe: formPessoa.value.tipo === 'Servo' ? formPessoa.value.equipe : null,
+
+    circulo_id:
+      formPessoa.value.tipo === 'Jovem'
+        ? formPessoa.value.circulo_id
+        : null,
+
+    equipe_id:
+      formPessoa.value.tipo === 'Servo'
+        ? formPessoa.value.equipe_id
+        : null,
+
+    responsavel: formPessoa.value.responsavel || null,
     observacao: formPessoa.value.observacao || null
   }
 
@@ -246,9 +286,10 @@ async function salvarPessoa() {
     nome: '',
     telefone: '',
     tipo: 'Jovem',
-    circulo: '',
-    equipe: '',
-    observacao: ''
+    circulo_id: null,
+    equipe_id: null,
+    observacao: '',
+    responsavel: ''
   }
 
   modalPessoaAberto.value = false
@@ -407,10 +448,18 @@ async function finalizarVenda() {
 
 function detalhePessoa(pessoa) {
   if (pessoa.tipo === 'Jovem') {
-    return `Jovem • ${pessoa.circulos?.nome || 'Sem círculo'}`
+    const circulo = circulosBanco.value.find(
+      c => c.id === pessoa.circulo_id
+    )
+
+    return `Jovem • ${circulo?.nome || 'Sem círculo'}`
   }
 
-  return `Servo • ${pessoa.equipes?.nome || 'Sem equipe'}`
+  const equipe = equipesBanco.value.find(
+    e => e.id === pessoa.equipe_id
+  )
+
+  return `Servo • ${equipe?.nome || 'Sem equipe'}`
 }
 
 function formatarMoeda(valor) {
@@ -762,17 +811,18 @@ onMounted(() => {
             class="field"
           >
             <label>Círculo</label>
-            <select v-model="formPessoa.circulo">
-              <option value="">Selecione o círculo</option>
 
-              <option
-                v-for="circulo in circulos"
-                :key="circulo"
-                :value="circulo"
-              >
-                {{ circulo }}
-              </option>
-            </select>
+<select v-model="formPessoa.circulo_id">
+  <option :value="null">Selecione o círculo</option>
+
+  <option
+    v-for="circulo in circulosBanco"
+    :key="circulo.id"
+    :value="circulo.id"
+  >
+    {{ circulo.nome }}
+  </option>
+</select>
           </div>
 
           <div
@@ -780,17 +830,18 @@ onMounted(() => {
             class="field"
           >
             <label>Equipe</label>
-            <select v-model="formPessoa.equipe">
-              <option value="">Selecione a equipe</option>
 
-              <option
-                v-for="equipe in equipes"
-                :key="equipe"
-                :value="equipe"
-              >
-                {{ equipe }}
-              </option>
-            </select>
+<select v-model="formPessoa.equipe_id">
+  <option :value="null">Selecione a equipe</option>
+
+  <option
+    v-for="equipe in equipesBanco"
+    :key="equipe.id"
+    :value="equipe.id"
+  >
+    {{ equipe.nome }}
+  </option>
+</select>
           </div>
 
           <div class="field">
@@ -883,6 +934,20 @@ onMounted(() => {
   color: #0b3558;
 }
 
+.cart-item{
+
+    background:white;
+
+    border:1px solid #dce8f0;
+
+    border-radius:14px;
+
+    padding:16px;
+
+    box-shadow:0 2px 8px rgba(11,53,88,.05);
+
+}
+
 input,
 select,
 textarea {
@@ -892,37 +957,84 @@ textarea {
 
 .produtos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
-  max-height: 700px;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 10px;
+  max-height: 620px;
   overflow-y: auto;
   padding-right: 4px;
 }
 
 .produto-item {
-  border: 1px solid #e3edf4;
-  border-radius: 14px;
-  padding: 14px;
   background: #f8fbfd;
+  border: 1px solid #dce8f0;
+  border-radius: 12px;
+  padding: 12px;
+
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
+
+  transition: .2s;
 }
 
-.produto-item strong {
-  display: block;
+.produto-item:hover{
+  border-color:#9ecce5;
+  box-shadow:0 5px 14px rgba(11,53,88,.08);
 }
 
-.produto-item span {
-  display: block;
-  color: #5c7285;
-  margin-top: 4px;
+.produto-item strong{
+    font-size:15px;
+    color:#0b3558;
 }
 
-.produto-item small {
-  display: block;
-  margin-top: 4px;
+.produto-item span{
+    display:block;
+    margin-top:3px;
+    color:#2f6c93;
+    font-weight:700;
+}
+
+.produto-item small{
+    margin-top:2px;
+    color:#66788b;
+    font-size:12px;
+}
+
+.produto-item button{
+    margin-top:auto;
+
+    width:100%;
+
+    height:38px;
+
+    border:none;
+
+    border-radius:8px;
+
+    background:#0b3558;
+
+    color:#fff;
+
+    font-size:14px;
+
+    font-weight:600;
+
+    cursor:pointer;
+
+    transition:.2s;
+}
+
+.produto-item button:hover{
+    background:#174b73;
+}
+
+.produto-item button:active{
+    transform:scale(.98);
+}
+
+.produto-item{
+    justify-content:space-between;
+    min-height:145px;
 }
 
 .estoqueBaixo {
@@ -935,12 +1047,12 @@ textarea {
   top: 20px;
 }
 
-.cart-item {
-  border: 1px solid #e3edf4;
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 12px;
-  background: #f8fbfd;
+.cart-item{
+    background:#fafcfe;
+    border:1px solid #dce8f0;
+    border-radius:12px;
+    padding:12px;
+    margin-bottom:10px;
 }
 
 .cart-top {
@@ -955,54 +1067,134 @@ textarea {
   margin-top: 4px;
 }
 
-.qty {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 12px 0;
+.qty{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:10px 0;
 }
 
-.qty button {
-  width: 36px;
-  height: 36px;
-  padding: 0;
+.qty button{
+
+    width:34px;
+    height:34px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:#0b3558;
+
+    color:#fff;
+
+    font-size:18px;
+    font-weight:bold;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    cursor:pointer;
+
+    transition:.2s;
 }
 
-.qty input {
-  width: 80px;
-  text-align: center;
-  margin: 0;
+.qty button:hover{
+    background:#174b73;
 }
 
-.subtotal {
-  margin-bottom: 10px;
+.qty input{
+
+    width:70px;
+
+    text-align:center;
+
+    font-weight:600;
+
+    border:1px solid #d8e6ef;
+
+    border-radius:10px;
 }
 
-.btn-remove {
-  background: #f2f2f2;
-  color: #555;
+.subtotal{
+
+    margin-top:12px;
+
+    color:#617789;
+
+    font-size:14px;
 }
 
-.total-box {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid #e3edf4;
-  border-bottom: 1px solid #e3edf4;
-  padding: 16px 0;
-  margin: 18px 0;
-  font-size: 20px;
-  font-weight: 700;
+.subtotal strong{
+
+    color:#0b3558;
+
+    font-size:16px;
 }
 
-.pessoa-box {
-  background: #eef6fb;
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+.btn-remove{
+    background:#fef2f2;
+    color:#c62828;
+    border:1px solid #efb5b5;
+
+    padding:8px 12px;
+
+    border-radius:8px;
+
+    font-size:13px;
+    font-weight:600;
+
+    cursor:pointer;
+
+    transition:.2s;
+}
+
+.btn-remove:hover{
+    background:#fde4e4;
+}
+
+.total-box{
+    background:#eef6fb;
+    border:1px solid #dbe6ef;
+    border-radius:14px;
+    padding:16px;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    margin:18px 0;
+
+    font-size:22px;
+    font-weight:700;
+}
+
+.pessoa-box{
+    margin-top:18px;
+    padding:18px;
+    background:#f8fbfd;
+    border:1px solid #dce8f0;
+    border-radius:14px;
+}
+
+.pessoa-selecionada{
+    margin-top:12px;
+    padding:14px;
+    background:#fff;
+    border:1px solid #dce8f0;
+    border-radius:10px;
+}
+
+.pessoa-selecionada strong{
+    display:block;
+    color:#0b3558;
+    font-size:16px;
+}
+
+.pessoa-selecionada small{
+    display:block;
+    color:#617789;
+    margin-top:3px;
 }
 
 .pessoa-box span {
@@ -1014,20 +1206,32 @@ textarea {
   color: #5c7285;
 }
 
-.payment-box {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-bottom: 18px;
+.payment-box{
+    margin-top:22px;
+    padding:18px;
+
+    background:#f8fbfd;
+
+    border:1px solid #dce8f0;
+
+    border-radius:14px;
 }
 
-.radio-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #0b3558;
-  font-weight: 600;
-  cursor: pointer;
+.radio-option{
+    display:flex;
+    align-items:center;
+    gap:10px;
+
+    margin-bottom:10px;
+
+    font-weight:600;
+
+    color:#0b3558;
+}
+
+.radio-option input{
+    width:18px;
+    height:18px;
 }
 
 .radio-option input {
@@ -1043,22 +1247,68 @@ textarea {
   gap: 10px;
 }
 
-.optional-box {
-  margin-left: 28px;
-  background: #f8fbfd;
-  border: 1px solid #e3edf4;
-  border-radius: 12px;
-  padding: 12px;
+.optional-box{
+    margin:12px 0 18px 28px;
+
+    padding:16px;
+
+    background:white;
+
+    border:1px solid #dce8f0;
+
+    border-radius:12px;
 }
 
-.optional-box p {
-  margin-top: 10px;
+.optional-box p{
+    margin-top:12px;
+
+    color:#0b3558;
+
+    font-size:15px;
 }
 
-.btn-finalizar {
-  width: 100%;
-  padding: 14px;
-  font-size: 16px;
+.optional-box input{
+    width:100%;
+    margin-bottom:10px;
+}
+
+.optional-box button{
+    width:100%;
+
+    background:#0b3558;
+
+    color:white;
+
+    border:none;
+
+    border-radius:8px;
+
+    padding:10px;
+
+    font-weight:600;
+}
+
+.optional-box button:hover{
+    background:#174b73;
+}
+
+.btn-finalizar{
+    width:100%;
+    padding:15px;
+
+    border-radius:12px;
+
+    background:#0b3558;
+    color:white;
+
+    font-size:16px;
+    font-weight:700;
+
+    transition:.2s;
+}
+
+.btn-finalizar:hover{
+    background:#12476f;
 }
 
 .btn-finalizar:disabled {
@@ -1066,9 +1316,29 @@ textarea {
   cursor: not-allowed;
 }
 
-.btn-secondary {
-  background: #eef6fb;
-  color: #0b3558;
+.btn-secondary{
+    width:100%;
+    margin-top:14px;
+
+    padding:11px;
+
+    background:#eef5fb;
+
+    color:#0b3558;
+
+    border:1px solid #cfe0ec;
+
+    border-radius:10px;
+
+    font-weight:600;
+
+    cursor:pointer;
+
+    transition:.2s;
+}
+
+.btn-secondary:hover{
+    background:#dfeef9;
 }
 
 .full {
@@ -1184,13 +1454,24 @@ textarea {
   min-height: 90px;
 }
 
+textarea{
+    margin-top:18px;
+
+    width:100%;
+    min-height:90px;
+
+    resize:vertical;
+}
+
 @media (max-width: 1000px) {
   .venda-layout {
     grid-template-columns: 1fr;
   }
 
-  .carrinho-card {
-    position: static;
+  .carrinho-card{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
   }
 
   .produtos-grid {
@@ -1229,4 +1510,32 @@ textarea {
   display: block;
   color: #5c7285;
 }
+
+input,
+select,
+textarea{
+
+    border:1px solid #d7e4ec;
+
+    border-radius:10px;
+
+    padding:10px 12px;
+
+    transition:.2s;
+
+    background:white;
+}
+
+input:focus,
+select:focus,
+textarea:focus{
+
+    border-color:#5f9fc4;
+
+    outline:none;
+
+    box-shadow:0 0 0 3px rgba(95,159,196,.15);
+
+}
+
 </style>

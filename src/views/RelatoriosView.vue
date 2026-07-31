@@ -20,7 +20,6 @@ function aviso(msg) {
   toast.warning(msg)
 }
 
-
 const pessoas = ref([])
 const vendas = ref([])
 const pagamentos = ref([])
@@ -123,12 +122,30 @@ const pessoasComResumo = computed(() => {
       .filter((venda) => venda.status_pagamento === 'Pago')
       .reduce((total, venda) => total + Number(venda.valor_total || 0), 0)
 
-    const pagamentosPosteriores = pagamentos.value
-      .filter((pagamento) => pagamento.pessoa_id === pessoa.id)
-      .reduce((total, pagamento) => total + Number(pagamento.valor || 0), 0)
+    const pagamentosDaPessoa = pagamentos.value.filter((pagamento) => {
+    return String(pagamento.pessoa_id) === String(pessoa.id)
+    })
+
+    const pagamentosPosteriores = pagamentosDaPessoa.reduce(
+    (total, pagamento) => total + Number(pagamento.valor || 0),
+    0
+    )
 
     const totalPago = totalPagoNaHora + pagamentosPosteriores
-    const totalPendente = Number(pessoa.saldo_pendente || 0)
+    const totalPendente = Math.max(0, totalVendido - totalPago)
+
+    // 👇 COLOQUE AQUI
+    if (pessoa.nome === 'Larissa Gabriela dos Santos Brandim') {
+      console.log('ID pessoa:', pessoa.id)
+      console.log('Pagamentos encontrados:', pagamentosDaPessoa)
+      console.log('Pagamentos posteriores:', pagamentosPosteriores)
+      console.log(
+      'Pagamentos da pessoa:',
+        pagamentos.value.filter(
+        p => p.pessoa_id === pessoa.id
+      )
+)
+    }
 
     return {
       ...pessoa,
@@ -194,15 +211,15 @@ const totalPagoGeral = computed(() => {
 })
 
 const totalPendenteGeral = computed(() => {
-  return pessoas.value.reduce(
-    (total, pessoa) => total + Number(pessoa.saldo_pendente || 0),
+  return pessoasComResumo.value.reduce(
+    (total, pessoa) => total + Number(pessoa.total_pendente || 0),
     0
   )
 })
 
 const quantidadeDevedores = computed(() => {
-  return pessoas.value.filter(
-    (pessoa) => Number(pessoa.saldo_pendente || 0) > 0
+  return pessoasComResumo.value.filter(
+    (pessoa) => Number(pessoa.total_pendente || 0) > 0
   ).length
 })
 
@@ -459,21 +476,33 @@ onMounted(() => {
 
     <section class="card">
       <div class="section-header">
-        <div>
-          <h2>{{ tituloLista }}</h2>
-          <p>{{ subtituloLista }}</p>
-        </div>
 
-        <input
-          v-model="busca"
-          placeholder="Buscar pessoa ou telefone"
-        />
-      </div>
+  <div class="header-text">
+    <h2>{{ tituloLista }}</h2>
+    <p>{{ subtituloLista }}</p>
+  </div>
 
-      <p class="contador-registros">
-        {{ pessoasFiltradas.length }}
-        {{ pessoasFiltradas.length === 1 ? 'pessoa encontrada' : 'pessoas encontradas' }}
-      </p>
+  <div class="header-search">
+    <input
+      v-model="busca"
+      placeholder="Buscar pessoa ou telefone"
+    />
+  </div>
+
+</div>
+
+      <div class="toolbar">
+
+  <div class="toolbar">
+
+  <p class="contador-registros">
+    {{ pessoasFiltradas.length }}
+    {{ pessoasFiltradas.length === 1 ? 'pessoa encontrada' : 'pessoas encontradas' }}
+  </p>
+
+</div>
+
+</div>
 
       <div class="tabs">
         <button
@@ -780,10 +809,22 @@ onMounted(() => {
   color: #6b7c8d;
 }
 
-.cards-resumo {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+.cards-resumo{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:18px;
+}
+
+.card-resumo{
+    padding:18px 22px;
+    min-height:auto;
+}
+
+.pendencias-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 28px;
+  box-shadow: 0 8px 20px rgba(15,23,42,.06);
 }
 
 .card-resumo,
@@ -813,7 +854,7 @@ onMounted(() => {
 }
 
 .card-resumo strong {
-  font-size: 26px;
+  font-size: 22px;
   color: #0b3558;
 }
 
@@ -823,6 +864,37 @@ onMounted(() => {
 
 .card {
   padding: 20px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  border: 1px solid #dbeafe;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
+}
+
+.stat-card h3 {
+  font-size: 18px;
+  color: #1e3a8a;
+  margin-bottom: 6px;
+}
+
+.stat-card p {
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.stat-card strong {
+  font-size: 34px;
+  color: #0f172a;
 }
 
 .section-header {
@@ -842,8 +914,12 @@ onMounted(() => {
   color: #6b7c8d;
 }
 
-.section-header input {
-  max-width: 320px;
+.section-header input{
+    width:320px;
+    height:42px;
+    padding:0 14px;
+    border-radius:10px;
+    border:1px solid #d6dbe5;
 }
 
 .tabs {
@@ -1125,6 +1201,85 @@ onMounted(() => {
 .btn-finalizar:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.busca input{
+  width:100%;
+  height:46px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  padding:0 14px;
+  font-size:15px;
+  margin:18px 0;
+}
+
+.busca input:focus{
+  border-color:#2563eb;
+  outline:none;
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
+.filtros{
+  display:flex;
+  gap:10px;
+  margin:18px 0 24px;
+}
+
+.filtros button{
+  padding:8px 18px;
+  border:none;
+  border-radius:8px;
+  background:#e2e8f0;
+  cursor:pointer;
+  transition:.2s;
+  font-weight:600;
+}
+
+.filtros button:hover{
+  background:#cbd5e1;
+}
+
+.filtros .ativo{
+  background:#2563eb;
+  color:white;
+}
+
+.sem-registros{
+  height:220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#94a3b8;
+  font-size:17px;
+}
+
+.toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin:20px 0;
+    gap:20px;
+    flex-wrap:wrap;
+}
+
+.tabs{
+    display:flex;
+    gap:10px;
+}
+
+.tabs button{
+    padding:10px 18px;
+    border:none;
+    border-radius:10px;
+    background:#eef4ff;
+    color:#1e3a8a;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.tabs button.active{
+    background:#2563eb;
+    color:#fff;
 }
 
 @media (max-width: 1200px) {

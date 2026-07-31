@@ -879,211 +879,189 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* ===========================
-   LAYOUT
-=========================== */
 
 .dashboard {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  padding: 30px;
-  background: #f5f7fb;
+  gap: 32px;
+  padding: 32px;
+  background: #f6f5fb;
   min-height: 100vh;
 }
-
-/* ===========================
-   CABEÇALHO
-=========================== */
 
 .cabecalho {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 20px;
+  gap: 24px;
 }
 
 .cabecalho h1 {
   margin: 0;
-  font-size: 30px;
+  font-size: 2rem;
   font-weight: 700;
-  color: #1f2937;
+  color: #312e81;
+  letter-spacing: -.5px;
 }
 
 .cabecalho p {
-  margin-top: 6px;
+  margin-top: 8px;
+  font-size: .95rem;
   color: #6b7280;
-  font-size: 15px;
 }
-
-/* ===========================
-   BOTÃO
-=========================== */
 
 .btn-atualizar {
   border: none;
-  outline: none;
-  cursor: pointer;
-  background: #22c55e;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 10px;
+  background: #5b21b6;
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 12px;
   font-weight: 600;
+  font-size: .95rem;
+  cursor: pointer;
   transition: .25s;
+  box-shadow: 0 8px 20px rgba(91,33,182,.18);
 }
 
 .btn-atualizar:hover {
-  background: #16a34a;
+  background: #4c1d95;
   transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(91,33,182,.25);
 }
 
-/* ===========================
-   GRID DOS CARDS
-=========================== */
+.loading {
+  background: #fff;
+  border-radius: 18px;
+  padding: 60px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 1rem;
+  border: 1px solid #ebe7fb;
+  box-shadow: 0 10px 30px rgba(91,33,182,.05);
+}
 
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px,1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit,minmax(240px,1fr));
+  gap: 22px;
 }
 
-/* ===========================
-   CARDS
-=========================== */
-
 .card {
-  background: white;
-  border-radius: 16px;
-  padding: 22px;
-  box-shadow: 0 8px 25px rgba(0,0,0,.06);
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  border: 1px solid #ece8fa;
+  box-shadow: 0 10px 30px rgba(15,23,42,.04);
   transition: .25s;
 }
 
 .card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 15px 35px rgba(0,0,0,.10);
+  box-shadow: 0 18px 35px rgba(15,23,42,.08);
 }
 
 .card strong {
-  font-size: 30px;
-  color: #111827;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1;
 }
 
 .card small {
+  font-size: .82rem;
   color: #6b7280;
-  font-size: 14px;
 }
 
 .titulo-card {
-  color: #6b7280;
-  font-size: 15px;
+  font-size: .85rem;
   font-weight: 600;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: .08em;
 }
 
-/* ===========================
-   CORES DOS CARDS
-=========================== */
-
 .card-primary {
-  border-left: 6px solid #3b82f6;
+  border-top: 4px solid #5b21b6;
 }
 
 .card-success {
-  border-left: 6px solid #22c55e;
+  border-top: 4px solid #7c3aed;
 }
 
 .card-warning {
-  border-left: 6px solid #f59e0b;
+  border-top: 4px solid #8b5cf6;
 }
 
 .card-danger {
-  border-left: 6px solid #ef4444;
+  border-top: 4px solid #a855f7;
 }
-
-/* ===========================
-   GRID DOS PAINÉIS
-=========================== */
 
 .ranking-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit,minmax(320px,1fr));
-  gap: 22px;
+  grid-template-columns: repeat(auto-fit,minmax(340px,1fr));
+  gap: 24px;
 }
 
-/* ===========================
-   PAINÉIS
-=========================== */
-
 .painel {
-  background: white;
-  border-radius: 16px;
-  padding: 22px;
-  box-shadow: 0 8px 25px rgba(0,0,0,.06);
+  background: #fff;
+  border-radius: 18px;
+  padding: 24px;
+  border: 1px solid #ece8fa;
+  box-shadow: 0 10px 30px rgba(15,23,42,.04);
+  overflow-x: auto;
 }
 
 .painel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 18px;
+  margin-bottom: 22px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1eff9;
 }
 
 .painel-header h2 {
   margin: 0;
-  font-size: 20px;
-  color: #1f2937;
+  font-size: 1.05rem;
+  color: #312e81;
+  font-weight: 700;
 }
 
 .sem-dados {
+  padding: 50px 20px;
   text-align: center;
-  padding: 35px;
   color: #9ca3af;
+  font-size: .95rem;
 }
-
-/* ===========================
-   LOADING
-=========================== */
-
-.loading {
-  background: white;
-  padding: 40px;
-  text-align: center;
-  border-radius: 16px;
-  font-size: 18px;
-  color: #6b7280;
-  box-shadow: 0 8px 25px rgba(0,0,0,.06);
-}
-
-/* ===========================
-   TABELAS
-=========================== */
-
 table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
 }
 
 thead {
-  background: #f8fafc;
+  background: #f8f7fd;
 }
 
 thead th {
-  padding: 14px;
+  padding: 15px 18px;
   text-align: left;
-  font-size: 14px;
-  color: #374151;
-  font-weight: 600;
-  border-bottom: 2px solid #e5e7eb;
+  font-size: .82rem;
+  font-weight: 700;
+  color: #5b21b6;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  border-bottom: 1px solid #ece8fa;
 }
 
 tbody td {
-  padding: 14px;
-  border-bottom: 1px solid #edf2f7;
+  padding: 16px 18px;
   color: #374151;
-  font-size: 14px;
+  font-size: .9rem;
+  border-bottom: 1px solid #f3f2f9;
 }
 
 tbody tr {
@@ -1091,12 +1069,16 @@ tbody tr {
 }
 
 tbody tr:hover {
-  background: #f9fafb;
+  background: #faf9fe;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .tabela-ranking td:first-child,
 .tabela-ranking th:first-child {
-  width: 45px;
+  width: 60px;
   text-align: center;
 }
 
@@ -1105,105 +1087,92 @@ tbody tr:hover {
   white-space: nowrap;
 }
 
-/* ===========================
-   STATUS
-=========================== */
+.tabela-ranking,
+.tabela-vendas {
+  min-width: 700px;
+}
 
 .status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 90px;
-  padding: 6px 12px;
+  padding: 7px 14px;
   border-radius: 999px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: .02em;
 }
 
 .status-pago {
-  background: #dcfce7;
-  color: #15803d;
+  background: #ede9fe;
+  color: #5b21b6;
 }
 
 .status-pendente {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #f3e8ff;
+  color: #7e22ce;
 }
 
-/* ===========================
-   RESUMO FINANCEIRO
-=========================== */
-
 .resumo-financeiro {
-  margin-top: 5px;
+  margin-top: 4px;
 }
 
 .resumo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+  grid-template-columns: repeat(auto-fit,minmax(230px,1fr));
   gap: 20px;
 }
 
 .resumo-item {
-  background: #f8fafc;
-  border-radius: 12px;
-  padding: 18px;
+  background: #faf9fe;
+  border: 1px solid #ece8fa;
+  border-radius: 16px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  border: 1px solid #e5e7eb;
+  gap: 10px;
+  transition: .2s;
+}
+
+.resumo-item:hover {
+  background: #fff;
+  transform: translateY(-2px);
 }
 
 .resumo-item span {
-  color: #6b7280;
-  font-size: 14px;
+  font-size: .82rem;
+  font-weight: 600;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: .05em;
 }
 
 .resumo-item strong {
-  font-size: 24px;
-  color: #111827;
+  font-size: 1.7rem;
+  color: #1f2937;
+  line-height: 1.1;
 }
-
-/* ===========================
-   SCROLL DAS TABELAS
-=========================== */
-
-.painel {
-  overflow-x: auto;
-}
-
-.tabela-ranking,
-.tabela-vendas {
-  min-width: 650px;
-}
-
-/* ===========================
-   BARRA DE ROLAGEM
-=========================== */
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
+  background: #c4b5fd;
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #a78bfa;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-/* ===========================
-   RESPONSIVIDADE
-=========================== */
-
-@media (max-width: 1100px) {
+@media (max-width:1100px) {
 
   .ranking-grid {
     grid-template-columns: 1fr;
@@ -1211,11 +1180,11 @@ tbody tr:hover {
 
 }
 
-@media (max-width: 768px) {
+@media (max-width:768px) {
 
   .dashboard {
-    padding: 18px;
-    gap: 18px;
+    padding: 20px;
+    gap: 24px;
   }
 
   .cabecalho {
@@ -1224,7 +1193,7 @@ tbody tr:hover {
   }
 
   .cabecalho h1 {
-    font-size: 24px;
+    font-size: 1.7rem;
   }
 
   .cards-grid {
@@ -1233,14 +1202,17 @@ tbody tr:hover {
 
   .btn-atualizar {
     width: 100%;
+    justify-content: center;
+  }
+
+  .card,
+  .painel,
+  .resumo-item {
+    padding: 20px;
   }
 
   .card strong {
-    font-size: 24px;
-  }
-
-  .painel {
-    padding: 16px;
+    font-size: 1.7rem;
   }
 
   .painel-header {
@@ -1251,31 +1223,33 @@ tbody tr:hover {
 
 }
 
-@media (max-width: 480px) {
+@media (max-width:480px) {
 
   .dashboard {
-    padding: 12px;
-  }
-
-  .card {
-    padding: 18px;
-  }
-
-  .painel {
     padding: 14px;
   }
 
-  .titulo-card {
-    font-size: 13px;
+  .cabecalho h1 {
+    font-size: 1.45rem;
   }
 
-  .card strong {
-    font-size: 22px;
+  .card,
+  .painel,
+  .resumo-item {
+    padding: 18px;
+    border-radius: 14px;
   }
 
+  .card strong,
   .resumo-item strong {
-    font-size: 20px;
+    font-size: 1.45rem;
+  }
+
+  .titulo-card,
+  .resumo-item span {
+    font-size: .75rem;
   }
 
 }
+
 </style>

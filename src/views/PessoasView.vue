@@ -1,8 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useToast } from 'vue-toastification'
-
+import { ref, computed, watch, onMounted } from 'vue'
 const toast = useToast()
 
 const pessoas = ref([])
@@ -10,6 +9,8 @@ const circulos = ref([])
 const equipes = ref([])
 
 const pesquisa = ref('')
+const mostrarFiltros = ref(false)
+const filtrosSelecionados = ref([])
 
 const modalCadastro = ref(false)
 const modalEdicao = ref(false)
@@ -86,22 +87,21 @@ async function carregarPessoas() {
 }
 
 const pessoasFiltradas = computed(() => {
+  const texto = pesquisa.value.trim().toLowerCase()
 
-  const texto = pesquisa.value
-    .trim()
-    .toLowerCase()
+  return pessoas.value.filter((p) => {
+    const passouPesquisa =
+      !texto ||
+      p.nome.toLowerCase().includes(texto) ||
+      p.telefone.includes(texto)
 
-  if (!texto)
-    return pessoas.value
+    const passouFiltro =
+      filtrosSelecionados.value.length === 0 ||
+      filtrosSelecionados.value.includes(p.circulos?.nome) ||
+      filtrosSelecionados.value.includes(p.equipes?.nome)
 
-  return pessoas.value.filter(p =>
-
-    p.nome.toLowerCase().includes(texto) ||
-
-    p.telefone.includes(texto)
-
-  )
-
+    return passouPesquisa && passouFiltro
+  })
 })
 
 function limparFormulario() {
@@ -173,10 +173,11 @@ async function salvarPessoa() {
     })
 
   if (error) {
-    console.error(error)
-    toast.error('Erro ao cadastrar.')
-    return
-  }
+  console.log(error)
+  alert(error.message)
+  toast.error(error.message)
+  return
+}
 
   toast.success('Pessoa cadastrada.')
 
@@ -301,6 +302,46 @@ onMounted(async () => {
   await carregarPessoas()
 
 })
+
+const paginaAtual = ref(1)
+
+const itensPorPagina = 10
+
+const totalPaginas = computed(() =>
+  Math.ceil(pessoasFiltradas.value.length / itensPorPagina)
+)
+
+const pessoasPaginadas = computed(() => {
+
+  const inicio = (paginaAtual.value - 1) * itensPorPagina
+
+  const fim = inicio + itensPorPagina
+
+  return pessoasFiltradas.value.slice(inicio, fim)
+
+})
+
+watch(pesquisa, () => {
+
+  paginaAtual.value = 1
+
+})
+
+function paginaAnterior() {
+
+  if (paginaAtual.value > 1)
+
+    paginaAtual.value--
+
+}
+
+function proximaPagina() {
+
+  if (paginaAtual.value < totalPaginas.value)
+
+    paginaAtual.value++
+
+}
 </script>
 
 <template>
@@ -368,14 +409,80 @@ onMounted(async () => {
 
       <div class="toolbar">
 
-        <input
-          v-model="pesquisa"
-          class="search"
-          autocomplete="off"
-          placeholder="Pesquisar por nome ou telefone..."
-        />
+  <input
+    v-model="pesquisa"
+    class="search"
+    autocomplete="off"
+    placeholder="Pesquisar por nome ou telefone..."
+  />
 
-      </div>
+  <div class="filtro-dropdown">
+
+    <button
+      type="button"
+      class="btn-filtro"
+      @click="mostrarFiltros = !mostrarFiltros"
+    >
+      Filtros
+      <span v-if="filtrosSelecionados.length">
+        ({{ filtrosSelecionados.length }})
+      </span>
+    </button>
+
+    <div
+  v-if="mostrarFiltros"
+  class="dropdown-menu"
+>
+  <div class="filtro-grupo">
+    <h4>Círculos</h4>
+
+    <label
+      v-for="circulo in circulos"
+      :key="'c' + circulo.id"
+      class="item-filtro"
+    >
+      <input
+        type="checkbox"
+        :value="circulo.nome"
+        v-model="filtrosSelecionados"
+      >
+      {{ circulo.nome }}
+    </label>
+  </div>
+
+  <hr>
+
+  <div class="filtro-grupo">
+    <h4>Equipes</h4>
+
+    <label
+      v-for="equipe in equipes"
+      :key="'e' + equipe.id"
+      class="item-filtro"
+    >
+      <input
+        type="checkbox"
+        :value="equipe.nome"
+        v-model="filtrosSelecionados"
+      >
+      {{ equipe.nome }}
+    </label>
+  </div>
+
+  <div class="acoes-filtro">
+    <button
+      type="button"
+      class="btn-limpar"
+      @click="filtrosSelecionados = []"
+    >
+      Limpar filtros
+    </button>
+  </div>
+</div>
+
+  </div>
+
+</div>
 
       <!-- TABELA -->
 
@@ -408,7 +515,7 @@ onMounted(async () => {
           <tbody>
 
             <tr
-              v-for="pessoa in pessoasFiltradas"
+              v-for="pessoa in pessoasPaginadas"
               :key="pessoa.id"
             >
 
@@ -494,7 +601,7 @@ onMounted(async () => {
             </tr>
 
             <tr
-              v-if="!pessoasFiltradas.length"
+              v-if="!pessoasPaginadas.length"
             >
 
               <td
@@ -511,6 +618,33 @@ onMounted(async () => {
           </tbody>
 
         </table>
+
+        <div
+  class="paginacao"
+  v-if="totalPaginas > 1"
+>
+
+  <button
+    @click="paginaAnterior"
+    :disabled="paginaAtual === 1"
+  >
+    ← Anterior
+  </button>
+
+  <span>
+
+    Página {{ paginaAtual }} de {{ totalPaginas }}
+
+  </span>
+
+  <button
+    @click="proximaPagina"
+    :disabled="paginaAtual === totalPaginas"
+  >
+    Próxima →
+  </button>
+
+</div>
 
       </div>
 
@@ -1047,7 +1181,9 @@ onMounted(async () => {
 ========================================== */
 
 .toolbar{
-    margin-bottom:25px;
+    display:flex;
+    align-items:center;
+    gap:12px;
 }
 
 .search{
@@ -1058,6 +1194,7 @@ onMounted(async () => {
     padding:0 16px;
     font-size:15px;
     transition:.25s;
+    flex:1;
 }
 
 .search:focus{
@@ -1367,6 +1504,107 @@ tbody tr:hover{
 }
 
 /* ==========================================
+   FILTRO
+========================================== */
+
+.filtro-dropdown{
+    position:relative;
+}
+
+.btn-filtro{
+    height:48px;
+    min-width:120px;
+    padding:0 18px;
+    border:none;
+    border-radius:12px;
+    background:#163b63;
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.25s;
+}
+
+.btn-filtro:hover{
+    background:#1d4f84;
+}
+
+.dropdown-menu{
+    position:absolute;
+    top:56px;
+    right:0;
+    width:300px;
+    max-height:420px;
+    overflow-y:auto;
+    background:#fff;
+    border-radius:16px;
+    box-shadow:0 15px 35px rgba(0,0,0,.15);
+    padding:18px;
+    z-index:999;
+    border:1px solid #e5e7eb;
+}
+
+.filtro-grupo{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+.filtro-grupo h4{
+    margin:0 0 8px;
+    font-size:13px;
+    color:#163b63;
+    text-transform:uppercase;
+    letter-spacing:.6px;
+}
+
+.item-filtro{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.item-filtro:hover{
+    background:#f5f7fb;
+}
+
+.item-filtro input{
+    width:16px;
+    height:16px;
+    cursor:pointer;
+}
+
+.dropdown-menu hr{
+    border:none;
+    border-top:1px solid #e8edf3;
+    margin:16px 0;
+}
+
+.acoes-filtro{
+    margin-top:18px;
+}
+
+.btn-limpar{
+    width:100%;
+    border:none;
+    border-radius:10px;
+    background:#163b63;
+    color:#fff;
+    padding:10px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.btn-limpar:hover{
+    background:#1d4f84;
+}
+
+/* ==========================================
    NOTEBOOKS (até 1200px)
 ========================================== */
 
@@ -1465,13 +1703,17 @@ tbody tr:hover{
     }
 
     .toolbar{
-        margin-bottom:18px;
-    }
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:18px;
+}
 
-    .search{
-        height:46px;
-        font-size:14px;
-    }
+.search{
+    flex:1;
+    height:46px;
+    font-size:14px;
+}
 
     .table-responsive{
         overflow-x:auto;
@@ -1556,6 +1798,58 @@ tbody tr:hover{
 
 }
 
+.filtro-dropdown {
+  position: relative;
+}
+
+.btn-filtro{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+
+    min-width:120px;
+    height:46px;
+
+    padding:0 18px;
+
+    background:#ffffff;
+    color:#163b63;
+
+    border:1px solid #d5dce5;
+    border-radius:12px;
+
+    font-size:14px;
+    font-weight:600;
+
+    cursor:pointer;
+    transition:.2s;
+}
+
+.btn-filtro:hover{
+    background:#f7f9fc;
+    border-color:#163b63;
+}
+
+.btn-filtro:hover {
+  background: #f5f7fb;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 50px;
+  right: 0;
+  width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+  padding: 10px;
+  z-index: 999;
+}
+
 /* ==========================================
    CELULARES PEQUENOS (até 480px)
 ========================================== */
@@ -1591,4 +1885,32 @@ tbody tr:hover{
     }
 
 }
+.paginacao{
+
+  display:flex;
+
+  justify-content:center;
+
+  align-items:center;
+
+  gap:20px;
+
+  margin-top:20px;
+
+}
+
+.paginacao button{
+
+  padding:10px 18px;
+
+}
+
+.paginacao button:disabled{
+
+  opacity:.5;
+
+  cursor:not-allowed;
+
+}
+
 </style>
