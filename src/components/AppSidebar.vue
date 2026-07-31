@@ -372,19 +372,17 @@ const menu = [
 
   .sidebar{
     position:fixed;
-
     top:0;
     left:0;
-
     z-index:999;
-
     height:100vh;
+
+    width:280px;
+    min-width:280px;
+    max-width:85vw;
   }
 
   .sidebar.closed{
-    width:300px;
-    min-width:300px;
-
     transform:translateX(-100%);
   }
 

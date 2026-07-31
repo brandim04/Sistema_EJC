@@ -1003,6 +1003,21 @@ onMounted(() => {
   color: #0b3558;
 }
 
+.btn-pagamento{
+    background:#2563eb;
+    color:#fff;
+}
+
+.btn-pagamento:hover{
+    background:#1d4ed8;
+}
+
+.btn-detalhes{
+    background:#eef5ff;
+    color:#1d4ed8;
+    border:1px solid #cddcf7;
+}
+
 .empty {
   text-align: center;
   color: #777;
@@ -1047,16 +1062,29 @@ onMounted(() => {
   margin: 0;
 }
 
-.modal-header p {
-  margin-top: 4px;
-  color: #6b7c8d;
+.modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:24px;
+    padding-bottom:18px;
+    border-bottom:1px solid #e7eef5;
 }
 
-.btn-close {
-  background: transparent;
-  color: #0b3558;
-  font-size: 28px;
-  padding: 0;
+.btn-close{
+    width:42px;
+    height:42px;
+    border:none;
+    border-radius:50%;
+    background:#eef5ff;
+    color:#0b3558;
+    font-size:22px;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.btn-close:hover{
+    background:#dce9ff;
 }
 
 .detalhes-resumo {
@@ -1066,10 +1094,17 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.detalhes-resumo div {
-  background: #eef6fb;
-  border-radius: 14px;
-  padding: 14px;
+.detalhes-resumo div{
+    background:#f8fbff;
+    border:1px solid #d9e7f5;
+    border-radius:16px;
+    padding:18px;
+    transition:.2s;
+}
+
+.detalhes-resumo div:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 22px rgba(15,23,42,.08);
 }
 
 .detalhes-resumo span {
@@ -1083,17 +1118,40 @@ onMounted(() => {
   color: #0b3558;
 }
 
+.acoes button,
+.modal-actions button{
+    height:42px;
+    border:none;
+    border-radius:10px;
+    padding:0 18px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+.acoes button:hover,
+.modal-actions button:hover{
+    transform:translateY(-1px);
+}
+
 .lista-vendas {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.venda-card {
-  border: 1px solid #e3edf4;
-  border-radius: 14px;
-  padding: 16px;
-  background: #f8fbfd;
+.venda-card{
+    background:white;
+    border:1px solid #dbe7f4;
+    border-radius:16px;
+    padding:18px;
+    box-shadow:0 6px 18px rgba(15,23,42,.05);
+    transition:.2s;
+}
+
+.venda-card:hover{
+    transform:translateY(-2px);
+    box-shadow:0 10px 24px rgba(15,23,42,.08);
 }
 
 .venda-top {
@@ -1201,6 +1259,15 @@ onMounted(() => {
 .btn-finalizar:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.btn-whatsapp{
+    background:#25D366;
+    color:white;
+}
+
+.btn-whatsapp:hover{
+    background:#1fb857;
 }
 
 .busca input{

@@ -132,19 +132,26 @@ function calcularKPIs() {
       0
     )
 
-  totalRecebido.value =
-    pagamentos.value.reduce(
-      (total, pagamento) =>
-        total + Number(pagamento.valor || 0),
-      0
-    )
+  const pagosNaHora = vendas.value
+  .filter(v => v.status_pagamento === 'Pago')
+  .reduce(
+    (total, venda) =>
+      total + Number(venda.valor_total || 0),
+    0
+  )
+
+const pagamentosPosteriores = pagamentos.value
+  .reduce(
+    (total, pagamento) =>
+      total + Number(pagamento.valor || 0),
+    0
+  )
+
+totalRecebido.value =
+  pagosNaHora + pagamentosPosteriores
 
   saldoPendente.value =
-    pessoas.value.reduce(
-      (total, pessoa) =>
-        total + Number(pessoa.saldo_pendente || 0),
-      0
-    )
+  totalVendido.value - totalRecebido.value
 
   pessoasPendentes.value =
     pessoas.value.filter(

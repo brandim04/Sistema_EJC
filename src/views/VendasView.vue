@@ -87,8 +87,10 @@ async function carregarDados() {
   const { data: pessoasData, error: erroPessoas } = await supabase
   .from('pessoas')
   .select(`
+    id,
     nome,
     tipo,
+    saldo_pendente,
     circulo_id,
     equipe_id
   `)
@@ -100,7 +102,7 @@ async function carregarDados() {
   }
 
   pessoas.value = pessoasData || []
-
+  console.log(pessoas.value[0])
 
 const { data: usuario } = await supabase.auth.getUser()
 
