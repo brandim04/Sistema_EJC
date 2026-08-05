@@ -1,9 +1,43 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useToast } from 'vue-toastification'
+import { useAuthStore } from '../stores/auth'
 
 const toast = useToast()
+const auth = useAuthStore()
+const menuVendaAberto = ref(null)
+const modalExcluirVendaAberto = ref(false)
+const vendaSelecionada = ref(null)
+const excluindoVenda = ref(false)
+
+function obterVendasComStatus(pessoaId) {
+  const vendasPessoa = vendas.value
+    .filter(venda => venda.pessoa_id === pessoaId)
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+
+  let pagamentoDisponivel = pagamentos.value
+    .filter(p => p.pessoa_id === pessoaId)
+    .reduce((total, p) => total + Number(p.valor || 0), 0)
+
+  return vendasPessoa.map(venda => {
+    let statusVisual = venda.status_pagamento
+
+    if (venda.status_pagamento === 'Pendente') {
+      if (pagamentoDisponivel >= Number(venda.valor_total)) {
+        pagamentoDisponivel -= Number(venda.valor_total)
+        statusVisual = 'Quitado depois'
+      } else {
+        statusVisual = 'Pendente'
+      }
+    }
+
+    return {
+      ...venda,
+      status_visual: statusVisual
+    }
+  })
+}
 
 function sucesso(msg) {
   toast.clear()
@@ -19,6 +53,66 @@ function aviso(msg) {
   toast.clear()
   toast.warning(msg)
 }
+
+function toggleMenuVenda(id) {
+  if (menuVendaAberto.value === id) {
+    menuVendaAberto.value = null
+  } else {
+    menuVendaAberto.value = id
+  }
+}
+
+function abrirModalExcluir(venda) {
+  vendaSelecionada.value = venda
+  modalExcluirVendaAberto.value = true
+  menuVendaAberto.value = null
+}
+
+async function excluirVenda() {
+  if (!vendaSelecionada.value) return
+
+  excluindoVenda.value = true
+
+  const { error } = await supabase
+    .from('vendas')
+    .update({
+      ativo: false,
+      excluida_em: new Date().toISOString(),
+      excluida_por: auth.usuario.id
+    })
+    .eq('id', vendaSelecionada.value.id)
+
+  if (error) {
+    console.error(error)
+    erro('Erro ao excluir venda')
+    excluindoVenda.value = false
+    return
+  }
+
+  sucesso('Venda excluída com sucesso')
+
+// Guarda o ID antes de atualizar tudo
+const pessoaId = pessoaSelecionada.value?.id
+
+await carregarDados()
+await nextTick()
+
+if (pessoaId) {
+  const pessoaAtualizada = pessoasComResumo.value.find(
+    p => p.id === pessoaId
+  )
+
+  if (pessoaAtualizada) {
+    pessoaSelecionada.value = pessoaAtualizada
+  }
+}
+
+}
+
+modalExcluirVendaAberto.value = false
+vendaSelecionada.value = null
+menuVendaAberto.value = null
+excluindoVenda.value = false
 
 const pessoas = ref([])
 const vendas = ref([])
@@ -39,6 +133,56 @@ const formPagamento = ref({
   observacao: ''
 })
 
+async function buscarTodasVendas() {
+  const todas = []
+  let inicio = 0
+  const tamanhoPagina = 1000
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('vendas')
+      .select(`
+        *,
+        pessoas (
+          id,
+          nome,
+          telefone,
+          tipo,
+          saldo_pendente,
+          circulos(nome),
+          equipes(nome)
+        ),
+        usuario:usuarios!vendas_usuario_id_fkey (
+          id,
+          nome
+        ),
+        itens_venda (
+          id,
+          quantidade,
+          preco_unitario,
+          subtotal,
+          produtos (
+            id,
+            nome
+          )
+        )
+      `)
+      .eq('ativo', true) // <-- ADICIONE ESTA LINHA
+      .order('created_at', { ascending: false })
+      .range(inicio, inicio + tamanhoPagina - 1)
+
+    if (error) throw error
+
+    todas.push(...data)
+
+    if (data.length < tamanhoPagina) break
+
+    inicio += tamanhoPagina
+  }
+
+  return todas
+}
+
 async function carregarDados() {
   const { data: pessoasData, error: erroPessoas } = await supabase
     .from('pessoas')
@@ -58,44 +202,18 @@ async function carregarDados() {
   pessoas.value = pessoasData || []
   console.log(pessoas.value)
 
-  const { data: vendasData, error: erroVendas } = await supabase
-    .from('vendas')
-.select(`
-  *,
-  pessoas (
-    id,
-    nome,
-    telefone,
-    tipo,
-    saldo_pendente,
-    circulos(nome),
-    equipes(nome)
-  ),
-  usuarios (
-    id,
-    nome
-  ),
-  itens_venda (
-    id,
-    quantidade,
-    preco_unitario,
-    subtotal,
-    produtos (
-      id,
-      nome
-    )
-  )
-`)
-    .order('created_at', { ascending: false })
+let vendasData
 
-  if (erroVendas) {
+try {
+  vendasData = await buscarTodasVendas()
+} catch (erroVendas) {
   console.error('ERRO VENDAS:', erroVendas)
-  alert(JSON.stringify(erroVendas))
   erro('Erro ao carregar vendas')
   return
 }
 
-  vendas.value = vendasData || []
+
+vendas.value = vendasData
 
   const { data: pagamentosData, error: erroPagamentos } = await supabase
     .from('pagamentos')
@@ -250,9 +368,7 @@ const subtituloLista = computed(() => {
 const vendasDaPessoaSelecionada = computed(() => {
   if (!pessoaSelecionada.value) return []
 
-  return vendas.value.filter(
-    (venda) => venda.pessoa_id === pessoaSelecionada.value.id
-  )
+  return obterVendasComStatus(pessoaSelecionada.value.id)
 })
 
 const pagamentosDaPessoaSelecionada = computed(() => {
@@ -348,9 +464,7 @@ async function registrarPagamento() {
 }
 
 function gerarMensagemWhatsApp(pessoa) {
-  const vendasPessoa = vendas.value.filter(
-    (venda) => venda.pessoa_id === pessoa.id
-  )
+  const vendasPessoa = obterVendasComStatus(pessoa.id)
 
   let mensagem = `Olá, ${pessoa.nome}!\n\n`
   mensagem += `Segue o resumo das suas compras no VIII Encontro do EJC.\n\n`
@@ -361,9 +475,11 @@ function gerarMensagemWhatsApp(pessoa) {
       const quantidade = item.quantidade || 1
 
       const status =
-        venda.status_pagamento === 'Pago'
-          ? '(pago)'
-          : '(pendente)'
+        venda.status_visual === 'Quitado depois'
+          ? '(quitado depois)'
+          : venda.status_pagamento === 'Pago'
+            ? '(pago)'
+            : '(pendente)'
 
       mensagem += `${quantidade}x ${nomeProduto} - ${formatarMoeda(item.subtotal)} ${status}\n`
     })
@@ -381,12 +497,20 @@ function gerarMensagemWhatsApp(pessoa) {
     pessoa.total_pendente || 0
   )}\n\n`
 
-  mensagem += `Valor para pagamento: ${formatarMoeda(
-    pessoa.total_pendente || 0
-  )}\n\n`
+  if (Number(pessoa.total_pendente || 0) > 0) {
+    mensagem += `💰 Valor para pagamento: ${formatarMoeda(
+      pessoa.total_pendente || 0
+    )}\n\n`
 
-  mensagem += `Deus abençoe!\n`
-  mensagem += `EJC - Paróquia N. Sra. de Guadalupe`
+    mensagem += `💳 PIX para pagamento\n`
+    mensagem += `📱 Chave: *86999967724*\n\n`
+    mensagem += `Após realizar o pagamento, envie o comprovante por este WhatsApp para registrarmos a quitação.\n\n`
+  } else {
+    mensagem += `✅ Todas as suas compras já estão quitadas. Muito obrigado!\n\n`
+  }
+
+  mensagem += `Deus abençoe! 🙏\n`
+  mensagem += `EJC - Paróquia Nossa Senhora de Guadalupe`
 
   return mensagem
 }
@@ -643,20 +767,47 @@ onMounted(() => {
   :key="venda.id"
   class="venda-card"
 >
-  <div class="venda-top">
+<div class="venda-top">
+
   <strong>
     {{ formatarData(venda.created_at) }}
     <span class="venda-vendedor">
-      • {{ venda.usuarios?.nome || 'Não informado' }}
+      • {{ venda.usuario?.nome || 'Não informado' }}
     </span>
   </strong>
 
-  <span
-    class="badge"
-    :class="venda.status_pagamento === 'Pago' ? 'pago' : 'pendente'"
-  >
-    {{ venda.status_pagamento }}
-  </span>
+  <div class="venda-actions">
+
+    <span
+      class="badge"
+      :class="{
+        pago: venda.status_visual === 'Pago',
+        quitado: venda.status_visual === 'Quitado depois',
+        pendente: venda.status_visual === 'Pendente'
+      }"
+    >
+      {{ venda.status_visual }}
+    </span>
+
+    <button
+      v-if="auth.usuario?.perfil === 'ADMIN'"
+      class="btn-menu"
+      @click="toggleMenuVenda(venda.id)"
+    >
+      ⋮
+    </button>
+
+    <div
+  v-if="menuVendaAberto === venda.id"
+  class="menu-venda"
+>
+  <button @click="abrirModalExcluir(venda)">
+    🗑 Excluir venda
+  </button>
+</div>
+
+  </div>
+
 </div>
 
 <div
@@ -807,6 +958,64 @@ onMounted(() => {
         {{ quitando ? 'Registrando...' : 'Confirmar pagamento' }}
       </button>
     </div>
+  </div>
+</div>
+
+<div
+  v-if="modalExcluirVendaAberto"
+  class="modal-overlay"
+>
+  <div class="modal pagamento-modal">
+
+    <div class="modal-header">
+      <h2>Excluir venda</h2>
+
+      <button
+        class="btn-close"
+        @click="modalExcluirVendaAberto = false"
+      >
+        ×
+      </button>
+    </div>
+
+    <p>
+      Deseja realmente excluir esta venda?
+    </p>
+
+    <div class="saldo-info">
+      <span>Valor da venda</span>
+      <strong>
+        {{ formatarMoeda(vendaSelecionada?.valor_total || 0) }}
+      </strong>
+    </div>
+
+    <p>
+      Esta ação removerá:
+    </p>
+
+    <ul>
+      <li>A venda</li>
+      <li>Os itens da venda</li>
+      <li>Os pagamentos vinculados</li>
+    </ul>
+
+    <div class="modal-actions">
+      <button
+        class="btn-secondary"
+        @click="modalExcluirVendaAberto = false"
+      >
+        Cancelar
+      </button>
+
+      <button
+        class="btn-danger"
+        @click="excluirVenda"
+        :disabled="excluindoVenda"
+      >
+        {{ excluindoVenda ? 'Excluindo...' : 'Excluir venda' }}
+      </button>
+    </div>
+
   </div>
 </div>
 </template>
@@ -1043,6 +1252,25 @@ onMounted(() => {
   padding: 24px;
 }
 
+.modal-confirmar {
+  max-width: 420px;
+}
+
+.warning {
+  color: #b91c1c;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: white;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -1187,6 +1415,44 @@ onMounted(() => {
   margin-left: 8px;
 }
 
+.venda-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    position:relative;
+}
+
+.menu-venda{
+    position:absolute;
+    top:42px;
+    right:0;
+
+    background:#fff;
+    border:1px solid #dbe7f4;
+    border-radius:10px;
+
+    box-shadow:0 8px 20px rgba(0,0,0,.15);
+
+    overflow:hidden;
+
+    z-index:100;
+}
+
+.menu-venda button{
+    width:170px;
+    padding:12px 16px;
+
+    border:none;
+    background:white;
+
+    text-align:left;
+    cursor:pointer;
+}
+
+.menu-venda button:hover{
+    background:#f5f7fb;
+}
+
 .badge {
   padding: 6px 12px;
   border-radius: 999px;
@@ -1202,6 +1468,11 @@ onMounted(() => {
 .badge.pendente {
   background: #fff3cd;
   color: #9a6a00;
+}
+
+.badge.quitado {
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .item-venda {
@@ -1396,6 +1667,33 @@ onMounted(() => {
   color:white;
 }
 
+.venda-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.btn-menu{
+    width:34px;
+    height:34px;
+
+    border:none;
+    border-radius:50%;
+
+    background:#eef5ff;
+    color:#0b3558;
+
+    font-size:20px;
+    font-weight:bold;
+
+    cursor:pointer;
+    transition:.2s;
+}
+
+.btn-menu:hover{
+    background:#dbeafe;
+}
+
 .venda-observacao {
   margin: 8px 0 12px;
   padding: 8px 12px;
@@ -1446,6 +1744,15 @@ onMounted(() => {
 .tabs button.active{
     background:#2563eb;
     color:#fff;
+}
+
+.btn-danger{
+    background:#dc2626;
+    color:white;
+}
+
+.btn-danger:hover{
+    background:#b91c1c;
 }
 
 @media (max-width: 1200px) {
