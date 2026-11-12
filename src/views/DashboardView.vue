@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { useToast } from 'vue-toastification'
 
 const toast = useToast()
@@ -48,6 +49,43 @@ const produtosMaisVendidos = ref([])
 const rankingCirculos = ref([])
 const rankingEquipes = ref([])
 const ultimasVendas = ref([])
+const filtroCirculo = ref('')
+const filtroEquipe = ref('')
+
+const circulosDisponiveis = computed(() => {
+  const porId = new Map()
+  pessoas.value.forEach(pessoa => {
+    if (pessoa.circulo_id && pessoa.circulos?.nome) porId.set(pessoa.circulo_id, pessoa.circulos.nome)
+  })
+  return [...porId].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+})
+
+const equipesDisponiveis = computed(() => {
+  const porId = new Map()
+  pessoas.value.forEach(pessoa => {
+    if (pessoa.equipe_id && pessoa.equipes?.nome) porId.set(pessoa.equipe_id, pessoa.equipes.nome)
+  })
+  return [...porId].map(([id, nome]) => ({ id, nome })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+})
+
+const pessoasDoFiltro = computed(() => pessoas.value.filter(pessoa =>
+  (!filtroCirculo.value || String(pessoa.circulo_id) === filtroCirculo.value) &&
+  (!filtroEquipe.value || String(pessoa.equipe_id) === filtroEquipe.value)
+))
+const idsPessoasDoFiltro = computed(() => new Set(pessoasDoFiltro.value.map(pessoa => String(pessoa.id))))
+const vendasDoFiltro = computed(() => {
+  if (!filtroCirculo.value && !filtroEquipe.value) return vendas.value
+  return vendas.value.filter(venda => idsPessoasDoFiltro.value.has(String(venda.pessoa_id)))
+})
+const pagamentosDoFiltro = computed(() => {
+  if (!filtroCirculo.value && !filtroEquipe.value) return pagamentos.value
+  return pagamentos.value.filter(pagamento => idsPessoasDoFiltro.value.has(String(pagamento.pessoa_id)))
+})
+const itensDoFiltro = computed(() => {
+  if (!filtroCirculo.value && !filtroEquipe.value) return itensVenda.value
+  const idsVendas = new Set(vendasDoFiltro.value.map(venda => String(venda.id)))
+  return itensVenda.value.filter(item => idsVendas.has(String(item.venda_id)))
+})
 
 /* ==========================
    CARREGAR DADOS
@@ -57,22 +95,17 @@ async function carregarDashboard() {
 
   loading.value = true
 
-  const [
-    pessoasResult,
-    vendasResult,
-    pagamentosResult,
-    itensResult
-  ] = await Promise.all([
-
-    supabase
+  try {
+    const [pessoasData, vendasData, pagamentosData, itensData] = await Promise.all([
+      fetchAllRows(supabase
       .from('pessoas')
       .select(`
         *,
         circulos(nome),
         equipes(nome)
-      `),
+      `)),
 
-    supabase
+      fetchAllRows(supabase
       .from('vendas')
       .select(`
         *,
@@ -86,27 +119,31 @@ async function carregarDashboard() {
       `)
       .order('created_at', {
         ascending: false
-      }),
+      })),
 
-    supabase
+    fetchAllRows(supabase
       .from('pagamentos')
-      .select('*'),
+      .select('*')),
 
-    supabase
+    fetchAllRows(supabase
       .from('itens_venda')
       .select(`
-        *,
+        id,
+        venda_id,
+        produto_id,
+        quantidade,
+        preco_unitario,
+        subtotal,
         produtos(
           nome
         )
-      `)
+      `))
+    ])
 
-  ])
-
-  pessoas.value = pessoasResult.data || []
-  vendas.value = vendasResult.data || []
-  pagamentos.value = pagamentosResult.data || []
-  itensVenda.value = itensResult.data || []
+    pessoas.value = pessoasData
+    vendas.value = vendasData
+    pagamentos.value = pagamentosData
+    itensVenda.value = itensData
 
   calcularKPIs()
   calcularIndicadoresHoje()
@@ -115,7 +152,12 @@ async function carregarDashboard() {
   calcularRankingEquipes()
   carregarUltimas()
 
-  loading.value = false
+  } catch (error) {
+    console.error(error)
+    erro('Erro ao carregar dados do dashboard')
+  } finally {
+    loading.value = false
+  }
 
 }
 
@@ -126,13 +168,13 @@ async function carregarDashboard() {
 function calcularKPIs() {
 
   totalVendido.value =
-    vendas.value.reduce(
+      vendasDoFiltro.value.reduce(
       (total, venda) =>
         total + Number(venda.valor_total || 0),
       0
     )
 
-  const pagosNaHora = vendas.value
+  const pagosNaHora = vendasDoFiltro.value
   .filter(v => v.status_pagamento === 'Pago')
   .reduce(
     (total, venda) =>
@@ -140,7 +182,7 @@ function calcularKPIs() {
     0
   )
 
-const pagamentosPosteriores = pagamentos.value
+const pagamentosPosteriores = pagamentosDoFiltro.value
   .reduce(
     (total, pagamento) =>
       total + Number(pagamento.valor || 0),
@@ -154,7 +196,7 @@ totalRecebido.value =
   totalVendido.value - totalRecebido.value
 
   pessoasPendentes.value =
-    pessoas.value.filter(
+    pessoasDoFiltro.value.filter(
       pessoa => Number(pessoa.saldo_pendente) > 0
     ).length
 
@@ -169,7 +211,7 @@ function calcularIndicadoresHoje() {
   const hoje = new Date().toISOString().split('T')[0]
 
   const vendasDoDia =
-    vendas.value.filter(venda =>
+    vendasDoFiltro.value.filter(venda =>
       venda.created_at.startsWith(hoje)
     )
 
@@ -202,7 +244,7 @@ function calcularProdutosMaisVendidos() {
 
   const mapa = {}
 
-  itensVenda.value.forEach(item => {
+  itensDoFiltro.value.forEach(item => {
 
     const nome = item.produtos?.nome || 'Produto'
 
@@ -233,7 +275,7 @@ function calcularRankingCirculos() {
 
   const mapa = {}
 
-  vendas.value.forEach(venda => {
+  vendasDoFiltro.value.forEach(venda => {
 
     const nome = venda.pessoas?.circulos?.nome
 
@@ -267,7 +309,7 @@ function calcularRankingEquipes() {
 
   const mapa = {}
 
-  vendas.value.forEach(venda => {
+  vendasDoFiltro.value.forEach(venda => {
 
     const nome = venda.pessoas?.equipes?.nome
 
@@ -299,7 +341,9 @@ function calcularRankingEquipes() {
 
 function carregarUltimas() {
 
-  ultimasVendas.value = vendas.value.slice(0, 8)
+  ultimasVendas.value = [...vendasDoFiltro.value]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 8)
 
 }
 
@@ -380,6 +424,15 @@ onMounted(() => {
   carregarDashboard()
 
 })
+
+watch([filtroCirculo, filtroEquipe], () => {
+  calcularKPIs()
+  calcularIndicadoresHoje()
+  calcularProdutosMaisVendidos()
+  calcularRankingCirculos()
+  calcularRankingEquipes()
+  carregarUltimas()
+})
 </script>
 
 <template>
@@ -390,7 +443,7 @@ onMounted(() => {
 
       <div>
         <h1>Painel de Controle</h1>
-        <p>Resumo geral das vendas do VIII EJC.</p>
+        <p>Resumo geral das vendas do XI EJC PSS.</p>
       </div>
 
       <button
@@ -412,6 +465,27 @@ onMounted(() => {
     </div>
 
     <template v-else>
+
+      <div class="filtros-dashboard" aria-label="Filtros do dashboard">
+        <label>
+          Círculo
+          <select v-model="filtroCirculo">
+            <option value="">Todos os círculos</option>
+            <option v-for="circulo in circulosDisponiveis" :key="circulo.id" :value="String(circulo.id)">
+              {{ circulo.nome }}
+            </option>
+          </select>
+        </label>
+        <label>
+          Equipe
+          <select v-model="filtroEquipe">
+            <option value="">Todas as equipes</option>
+            <option v-for="equipe in equipesDisponiveis" :key="equipe.id" :value="String(equipe.id)">
+              {{ equipe.nome }}
+            </option>
+          </select>
+        </label>
+      </div>
 
       <!-- KPIs -->
 
@@ -892,7 +966,7 @@ onMounted(() => {
   flex-direction: column;
   gap: 32px;
   padding: 32px;
-  background: #f6f5fb;
+  background: #f7f5ef;
   min-height: 100vh;
 }
 
@@ -907,7 +981,7 @@ onMounted(() => {
   margin: 0;
   font-size: 2rem;
   font-weight: 700;
-  color: #312e81;
+  color: #2b2515;
   letter-spacing: -.5px;
 }
 
@@ -917,9 +991,32 @@ onMounted(() => {
   color: #6b7280;
 }
 
+.filtros-dashboard {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.filtros-dashboard label {
+  display: grid;
+  gap: 7px;
+  color: #55451d;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+.filtros-dashboard select {
+  min-width: 220px;
+  padding: 10px 12px;
+  border: 1px solid #d4c28a;
+  border-radius: 10px;
+  background: #fff;
+  color: #151515;
+}
+
 .btn-atualizar {
   border: none;
-  background: #5b21b6;
+  background: #a48120;
   color: #fff;
   padding: 12px 22px;
   border-radius: 12px;
@@ -931,7 +1028,7 @@ onMounted(() => {
 }
 
 .btn-atualizar:hover {
-  background: #4c1d95;
+  background: #775f1c;
   transform: translateY(-2px);
   box-shadow: 0 12px 28px rgba(91,33,182,.25);
 }
@@ -985,25 +1082,25 @@ onMounted(() => {
 .titulo-card {
   font-size: .85rem;
   font-weight: 600;
-  color: #7c3aed;
+  color: #bd982c;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
 
 .card-primary {
-  border-top: 4px solid #5b21b6;
+  border-top: 4px solid #a48120;
 }
 
 .card-success {
-  border-top: 4px solid #7c3aed;
+  border-top: 4px solid #bd982c;
 }
 
 .card-warning {
-  border-top: 4px solid #8b5cf6;
+  border-top: 4px solid #c7a942;
 }
 
 .card-danger {
-  border-top: 4px solid #a855f7;
+  border-top: 4px solid #d0b85c;
 }
 
 .ranking-grid {
@@ -1033,7 +1130,7 @@ onMounted(() => {
 .painel-header h2 {
   margin: 0;
   font-size: 1.05rem;
-  color: #312e81;
+  color: #2b2515;
   font-weight: 700;
 }
 
@@ -1058,7 +1155,7 @@ thead th {
   text-align: left;
   font-size: .82rem;
   font-weight: 700;
-  color: #5b21b6;
+  color: #a48120;
   text-transform: uppercase;
   letter-spacing: .06em;
   border-bottom: 1px solid #ece8fa;
@@ -1112,13 +1209,13 @@ tbody tr:last-child td {
 }
 
 .status-pago {
-  background: #ede9fe;
-  color: #5b21b6;
+  background: #f5eed3;
+  color: #a48120;
 }
 
 .status-pendente {
-  background: #f3e8ff;
-  color: #7e22ce;
+  background: #f3ebd2;
+  color: #896c20;
 }
 
 .resumo-financeiro {
@@ -1150,7 +1247,7 @@ tbody tr:last-child td {
 .resumo-item span {
   font-size: .82rem;
   font-weight: 600;
-  color: #7c3aed;
+  color: #bd982c;
   text-transform: uppercase;
   letter-spacing: .05em;
 }
@@ -1167,12 +1264,12 @@ tbody tr:last-child td {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c4b5fd;
+  background: #dfd1a2;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a78bfa;
+  background: #cfb861;
 }
 
 ::-webkit-scrollbar-track {

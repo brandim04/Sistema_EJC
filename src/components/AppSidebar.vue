@@ -107,20 +107,19 @@ function fecharNoMobile() {
 
     <div class="theme-card">
 
-      <span>VIII ENCONTRO</span>
+      <span>XI EJC PSS</span>
 
       <h2>
-        TUA VONTADE
+        FAZ DO MEU NÃO
         <br>
-        É O MEU CÉU
+        UM EIS-ME AQUI!
       </h2>
 
       <div class="gold-line"></div>
 
-      <p>
-        Paróquia Nossa Senhora
-        <br>
-        de Guadalupe
+      <p class="theme-verse">
+        “Se alguém está em Cristo, é uma nova criatura.”
+        <strong>2 Coríntios 5,17</strong>
       </p>
 
     </div>
@@ -157,7 +156,7 @@ function fecharNoMobile() {
 
   background:
     radial-gradient(circle at bottom, rgba(255,255,255,.30), transparent 30%),
-    linear-gradient(180deg,#88bddc 0%,#4b8eb8 38%,#0b3558 100%);
+    linear-gradient(180deg,#171715 0%,#10100f 56%,#080808 100%);
 }
 
 .sidebar.closed{
@@ -229,7 +228,7 @@ function fecharNoMobile() {
 
   background:white;
 
-  color:#0b3558;
+  color:#151515;
 
   text-decoration:none;
 
@@ -252,7 +251,7 @@ function fecharNoMobile() {
 .link.active{
   background:white;
 
-  border-left:4px solid #d6b35f;
+  border-left:4px solid #fdb52e;
 
   padding-left:12px;
 
@@ -280,7 +279,7 @@ function fecharNoMobile() {
 
   margin-bottom:8px;
 
-  color:#d6b35f;
+  color:#fdb52e;
 
   font-size:12px;
 
@@ -292,7 +291,7 @@ function fecharNoMobile() {
 .theme-card h2{
   margin:0;
 
-  color:#062f52;
+  color:#f3ead0;
 
   font-size:20px;
 
@@ -308,7 +307,7 @@ function fecharNoMobile() {
 
   margin:14px 0;
 
-  background:#d6b35f;
+  background:#fdb52e;
 
   border-radius:999px;
 }
@@ -316,13 +315,20 @@ function fecharNoMobile() {
 .theme-card p{
   margin:0;
 
-  color:#173d60;
+  color:#ddd6c5;
 
   font-size:13px;
 
   line-height:1.5;
 
   font-weight:500;
+}
+
+.theme-verse strong{
+  display:block;
+  margin-top:5px;
+  color:#fdb52e;
+  font-size:11px;
 }
 
 /* =======================
@@ -349,7 +355,7 @@ function fecharNoMobile() {
 
   margin:18px auto 0;
 
-  border:2px solid #d6b35f;
+  border:2px solid #fdb52e;
 
   border-radius:50%;
 }

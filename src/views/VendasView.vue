@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { useToast } from 'vue-toastification'
 
 const toast = useToast()
@@ -83,7 +84,10 @@ const formPessoa = ref({
 })
 
 async function carregarDados() {
-  const { data: pessoasData, error: erroPessoas } = await supabase
+  let pessoasData
+  let erroPessoas
+  try {
+    pessoasData = await fetchAllRows(supabase
   .from('pessoas')
   .select(`
     id,
@@ -92,7 +96,10 @@ async function carregarDados() {
     saldo_pendente,
     circulo_id,
     equipe_id
-  `)
+  `))
+  } catch (error) {
+    erroPessoas = error
+  }
 
   if (erroPessoas) {
     console.error(erroPessoas)
@@ -106,10 +113,16 @@ async function carregarDados() {
 const { data: usuario } = await supabase.auth.getUser()
 
 
-const { data: equipesData, error: erroEquipes } = await supabase
+let equipesData
+let erroEquipes
+try {
+  equipesData = await fetchAllRows(supabase
   .from('equipes')
   .select('id, nome')
-  .order('nome')
+  .order('nome'))
+} catch (error) {
+  erroEquipes = error
+}
 
 
 if (erroEquipes) {
@@ -118,10 +131,16 @@ if (erroEquipes) {
   equipesBanco.value = equipesData || []
 }
 
-const { data: circulosData, error: erroCirculos } = await supabase
+let circulosData
+let erroCirculos
+try {
+  circulosData = await fetchAllRows(supabase
   .from('circulos')
   .select('id, nome')
-  .order('nome')
+  .order('nome'))
+} catch (error) {
+  erroCirculos = error
+}
 
 
 if (erroCirculos) {
@@ -130,12 +149,18 @@ if (erroCirculos) {
   circulosBanco.value = circulosData || []
 }
 
-  const { data: produtosData, error: erroProdutos } = await supabase
+  let produtosData
+  let erroProdutos
+  try {
+    produtosData = await fetchAllRows(supabase
     .from('produtos')
-    .select('*')
+    .select('id, codigo, nome, categoria, preco, estoque, ativo')
     .eq('ativo', true)
     .gt('estoque', 0)
-    .order('nome')
+    .order('nome'))
+  } catch (error) {
+    erroProdutos = error
+  }
 
   if (erroProdutos) {
     console.error(erroProdutos)
@@ -899,7 +924,7 @@ onMounted(() => {
 
 .card h2 {
   margin-top: 0;
-  color: #0b3558;
+  color: #151515;
 }
 
 .cart-item{
@@ -912,7 +937,7 @@ onMounted(() => {
 
     padding:16px;
 
-    box-shadow:0 2px 8px rgba(11,53,88,.05);
+    box-shadow:0 2px 8px rgba(0,0,0,.05);
 
 }
 
@@ -946,19 +971,19 @@ textarea {
 }
 
 .produto-item:hover{
-  border-color:#9ecce5;
-  box-shadow:0 5px 14px rgba(11,53,88,.08);
+  border-color:#eadca8;
+  box-shadow:0 5px 14px rgba(0,0,0,.08);
 }
 
 .produto-item strong{
     font-size:15px;
-    color:#0b3558;
+    color:#151515;
 }
 
 .produto-item span{
     display:block;
     margin-top:3px;
-    color:#2f6c93;
+    color:#736024;
     font-weight:700;
 }
 
@@ -979,7 +1004,7 @@ textarea {
 
     border-radius:8px;
 
-    background:#0b3558;
+    background:#151515;
 
     color:#fff;
 
@@ -993,7 +1018,7 @@ textarea {
 }
 
 .produto-item button:hover{
-    background:#174b73;
+    background:#26241e;
 }
 
 .produto-item button:active{
@@ -1051,7 +1076,7 @@ textarea {
 
     border-radius:10px;
 
-    background:#0b3558;
+    background:#151515;
 
     color:#fff;
 
@@ -1068,7 +1093,7 @@ textarea {
 }
 
 .qty button:hover{
-    background:#174b73;
+    background:#26241e;
 }
 
 .qty input{
@@ -1095,7 +1120,7 @@ textarea {
 
 .subtotal strong{
 
-    color:#0b3558;
+    color:#151515;
 
     font-size:16px;
 }
@@ -1122,7 +1147,7 @@ textarea {
 }
 
 .total-box{
-    background:#eef6fb;
+    background:#f6f2e8;
     border:1px solid #dbe6ef;
     border-radius:14px;
     padding:16px;
@@ -1155,7 +1180,7 @@ textarea {
 
 .pessoa-selecionada strong{
     display:block;
-    color:#0b3558;
+    color:#151515;
     font-size:16px;
 }
 
@@ -1194,7 +1219,7 @@ textarea {
 
     font-weight:600;
 
-    color:#0b3558;
+    color:#151515;
 }
 
 .radio-option input{
@@ -1230,7 +1255,7 @@ textarea {
 .optional-box p{
     margin-top:12px;
 
-    color:#0b3558;
+    color:#151515;
 
     font-size:15px;
 }
@@ -1243,7 +1268,7 @@ textarea {
 .optional-box button{
     width:100%;
 
-    background:#0b3558;
+    background:#151515;
 
     color:white;
 
@@ -1257,7 +1282,7 @@ textarea {
 }
 
 .optional-box button:hover{
-    background:#174b73;
+    background:#26241e;
 }
 
 .btn-finalizar{
@@ -1266,7 +1291,7 @@ textarea {
 
     border-radius:12px;
 
-    background:#0b3558;
+    background:#151515;
     color:white;
 
     font-size:16px;
@@ -1276,7 +1301,7 @@ textarea {
 }
 
 .btn-finalizar:hover{
-    background:#12476f;
+    background:#211f1a;
 }
 
 .btn-finalizar:disabled {
@@ -1292,7 +1317,7 @@ textarea {
 
     background:#eef5fb;
 
-    color:#0b3558;
+    color:#151515;
 
     border:1px solid #cfe0ec;
 
@@ -1351,7 +1376,7 @@ textarea {
 
 .btn-close {
   background: transparent;
-  color: #0b3558;
+  color: #151515;
   font-size: 26px;
   padding: 0;
 }
@@ -1371,7 +1396,7 @@ textarea {
   background: #f8fbfd;
   padding: 13px;
   text-align: left;
-  color: #0b3558;
+  color: #151515;
 }
 
 .list-item span,
@@ -1394,7 +1419,7 @@ textarea {
 
 .field label {
   font-weight: 600;
-  color: #0b3558;
+  color: #151515;
 }
 
 .pix-modal {
@@ -1449,7 +1474,7 @@ textarea{
 
 .pessoa-box h3 {
   margin: 0 0 12px;
-  color: #0b3558;
+  color: #151515;
 }
 
 .lista-pessoas {
@@ -1464,7 +1489,7 @@ textarea{
   text-align: left;
   background: white;
   border: 1px solid #dbe6ee;
-  color: #0b3558;
+  color: #151515;
 }
 
 .pessoa-selecionada {
@@ -1498,7 +1523,7 @@ input:focus,
 select:focus,
 textarea:focus{
 
-    border-color:#5f9fc4;
+    border-color:#b58d28;
 
     outline:none;
 

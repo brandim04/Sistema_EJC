@@ -13,7 +13,7 @@ import AppSidebar from '../components/AppSidebar.vue'
       <AppHeader />
 
       <main class="content">
-        <RouterView />
+        <slot />
       </main>
 
     </div>
@@ -27,7 +27,7 @@ import AppSidebar from '../components/AppSidebar.vue'
   width:100%;
   height:100vh;
   overflow:hidden;
-  background:#eef3f8;
+  background:#f4f2ec;
 }
 
 .main{
@@ -44,7 +44,7 @@ import AppSidebar from '../components/AppSidebar.vue'
   overflow-x:hidden;
   padding:28px;
   background:
-    radial-gradient(circle at top right,#f7fbff 0%,#eef3f8 70%);
+    radial-gradient(circle at top right,#fbfaf7 0%,#f4f2ec 70%);
 }
 
 .sidebar{
@@ -64,7 +64,7 @@ import AppSidebar from '../components/AppSidebar.vue'
 
   background:
     radial-gradient(circle at bottom, rgba(255,255,255,.30), transparent 30%),
-    linear-gradient(180deg,#88bddc 0%,#4b8eb8 38%,#0b3558 100%);
+    linear-gradient(180deg,#1b1a18 0%,#292720 38%,#151515 100%);
 }
 
 @media (max-width:768px){

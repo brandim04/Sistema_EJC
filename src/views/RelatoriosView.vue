@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { useToast } from 'vue-toastification'
 import { useAuthStore } from '../stores/auth'
 
@@ -10,6 +11,7 @@ const menuVendaAberto = ref(null)
 const modalExcluirVendaAberto = ref(false)
 const vendaSelecionada = ref(null)
 const excluindoVenda = ref(false)
+const lucroEvento = ref(null)
 
 function obterVendasComStatus(pessoaId) {
   const vendasPessoa = vendas.value
@@ -134,12 +136,7 @@ const formPagamento = ref({
 })
 
 async function buscarTodasVendas() {
-  const todas = []
-  let inicio = 0
-  const tamanhoPagina = 1000
-
-  while (true) {
-    const { data, error } = await supabase
+  return fetchAllRows(supabase
       .from('vendas')
       .select(`
         *,
@@ -155,43 +152,27 @@ async function buscarTodasVendas() {
         usuario:usuarios!vendas_usuario_id_fkey (
           id,
           nome
-        ),
-        itens_venda (
-          id,
-          quantidade,
-          preco_unitario,
-          subtotal,
-          produtos (
-            id,
-            nome
-          )
         )
       `)
       .eq('ativo', true) // <-- ADICIONE ESTA LINHA
-      .order('created_at', { ascending: false })
-      .range(inicio, inicio + tamanhoPagina - 1)
-
-    if (error) throw error
-
-    todas.push(...data)
-
-    if (data.length < tamanhoPagina) break
-
-    inicio += tamanhoPagina
-  }
-
-  return todas
+      .order('created_at', { ascending: false }))
 }
 
 async function carregarDados() {
-  const { data: pessoasData, error: erroPessoas } = await supabase
+  let pessoasData
+  let erroPessoas
+  try {
+    pessoasData = await fetchAllRows(supabase
     .from('pessoas')
     .select(`
      *,
       circulos(nome),
       equipes(nome)
     `)
-    .order('nome')
+    .order('nome'))
+  } catch (error) {
+    erroPessoas = error
+  }
 
   if (erroPessoas) {
     console.error(erroPessoas)
@@ -200,12 +181,28 @@ async function carregarDados() {
   }
 
   pessoas.value = pessoasData || []
-  console.log(pessoas.value)
 
 let vendasData
+let itensData
 
 try {
-  vendasData = await buscarTodasVendas()
+  ;[vendasData, itensData] = await Promise.all([
+    buscarTodasVendas(),
+    fetchAllRows(supabase
+      .from('itens_venda')
+      .select(`
+        id,
+        venda_id,
+        produto_id,
+        quantidade,
+        preco_unitario,
+        subtotal,
+        produtos (
+          id,
+          nome
+        )
+      `))
+  ])
 } catch (erroVendas) {
   console.error('ERRO VENDAS:', erroVendas)
   erro('Erro ao carregar vendas')
@@ -213,12 +210,28 @@ try {
 }
 
 
+const itensPorVenda = new Map()
+for (const item of itensData) {
+  const chave = String(item.venda_id)
+  if (!itensPorVenda.has(chave)) itensPorVenda.set(chave, [])
+  itensPorVenda.get(chave).push(item)
+}
+vendasData.forEach(venda => {
+  venda.itens_venda = itensPorVenda.get(String(venda.id)) || []
+})
+
 vendas.value = vendasData
 
-  const { data: pagamentosData, error: erroPagamentos } = await supabase
+  let pagamentosData
+  let erroPagamentos
+  try {
+    pagamentosData = await fetchAllRows(supabase
     .from('pagamentos')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }))
+  } catch (error) {
+    erroPagamentos = error
+  }
 
   if (erroPagamentos) {
     console.error(erroPagamentos)
@@ -227,6 +240,17 @@ vendas.value = vendasData
   }
 
   pagamentos.value = pagamentosData || []
+
+  if (auth.usuario?.perfil === 'ADMIN') {
+    const { data, error } = await supabase.rpc('resumo_financeiro_produtos')
+    if (error) {
+      console.error(error)
+      lucroEvento.value = null
+    } else {
+      const resumo = Array.isArray(data) ? data[0] : data
+      lucroEvento.value = Number(resumo?.lucro_bruto || 0)
+    }
+  }
 }
 
 const pessoasComResumo = computed(() => {
@@ -354,15 +378,15 @@ const quantidadePagos = computed(() => {
 })
 
 const tituloLista = computed(() => {
-  return filtroStatus.value === 'pendentes'
-    ? 'Pessoas com pendência'
-    : 'Pessoas com pagamento em dia'
+  if (filtroStatus.value === 'pendentes') return 'Pessoas com pagamentos pendentes'
+  if (filtroStatus.value === 'pagos') return 'Pessoas com pagamento em dia'
+  return 'Pessoas'
 })
 
 const subtituloLista = computed(() => {
-  return filtroStatus.value === 'pendentes'
-    ? 'Pessoas que ainda possuem valor para cobrança.'
-    : 'Pessoas que já estão sem saldo pendente.'
+  if (filtroStatus.value === 'pendentes') return 'Pessoas que ainda possuem saldo pendente.'
+  if (filtroStatus.value === 'pagos') return 'Pessoas que já estão sem saldo pendente.'
+  return 'Visualize todas as pessoas cadastradas.'
 })
 
 const vendasDaPessoaSelecionada = computed(() => {
@@ -467,7 +491,7 @@ function gerarMensagemWhatsApp(pessoa) {
   const vendasPessoa = obterVendasComStatus(pessoa.id)
 
   let mensagem = `Olá, ${pessoa.nome}!\n\n`
-  mensagem += `Segue o resumo das suas compras no VIII Encontro do EJC.\n\n`
+  mensagem += `Segue o resumo das suas compras no XI EJC PSS.\n\n`
 
   vendasPessoa.forEach((venda) => {
     venda.itens_venda?.forEach((item) => {
@@ -510,7 +534,7 @@ function gerarMensagemWhatsApp(pessoa) {
   }
 
   mensagem += `Deus abençoe! 🙏\n`
-  mensagem += `EJC - Paróquia Nossa Senhora de Guadalupe`
+  mensagem += `XI EJC PSS`
 
   return mensagem
 }
@@ -601,6 +625,11 @@ onMounted(() => {
         <strong>{{ quantidadeDevedores }}</strong>
       </div>
     </div>
+
+    <section v-if="auth.usuario?.perfil === 'ADMIN'" class="card lucro-evento">
+      <h2>Lucro do Evento</h2>
+      <strong>{{ lucroEvento === null ? '—' : formatarMoeda(lucroEvento) }}</strong>
+    </section>
 
     <section class="card">
       <div class="section-header">
@@ -1069,7 +1098,7 @@ onMounted(() => {
 
 .card-resumo span {
   display: block;
-  color: #0b3558;
+  color: #151515;
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -1083,15 +1112,31 @@ onMounted(() => {
 
 .card-resumo strong {
   font-size: 22px;
-  color: #0b3558;
+  color: #151515;
 }
 
 .card-resumo.pendente {
-  border-color: #d6b35f;
+  border-color: #fdb52e;
 }
 
 .card {
   padding: 20px;
+}
+
+.lucro-evento {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lucro-evento h2 {
+  margin: 0;
+}
+
+.lucro-evento strong {
+  color: #151515;
+  font-size: 28px;
 }
 
 .stats {
@@ -1105,13 +1150,13 @@ onMounted(() => {
   background: #fff;
   border-radius: 16px;
   padding: 24px;
-  border: 1px solid #dbeafe;
+  border: 1px solid #f2e9cb;
   box-shadow: 0 8px 20px rgba(15, 23, 42, .06);
 }
 
 .stat-card h3 {
   font-size: 18px;
-  color: #1e3a8a;
+  color: #5a4511;
   margin-bottom: 6px;
 }
 
@@ -1157,12 +1202,12 @@ onMounted(() => {
 }
 
 .tabs button {
-  background: #eef6fb;
-  color: #0b3558;
+  background: #f6f2e8;
+  color: #151515;
 }
 
 .tabs button.active {
-  background: #0b3558;
+  background: #151515;
   color: white;
 }
 
@@ -1207,7 +1252,7 @@ onMounted(() => {
   display: block;
   margin-top: 4px;
   font-size: 18px;
-  color: #0b3558;
+  color: #151515;
 }
 
 .valor-card.pendente strong {
@@ -1227,23 +1272,23 @@ onMounted(() => {
 }
 
 .btn-secondary {
-  background: #eef6fb;
-  color: #0b3558;
+  background: #f6f2e8;
+  color: #151515;
 }
 
 .btn-pagamento{
-    background:#2563eb;
+    background:#9a7618;
     color:#fff;
 }
 
 .btn-pagamento:hover{
-    background:#1d4ed8;
+    background:#7f6114;
 }
 
 .btn-detalhes{
-    background:#eef5ff;
-    color:#1d4ed8;
-    border:1px solid #cddcf7;
+    background:#f7f3e5;
+    color:#7f6114;
+    border:1px solid #e6dbb8;
 }
 
 .empty {
@@ -1323,8 +1368,8 @@ onMounted(() => {
     height:42px;
     border:none;
     border-radius:50%;
-    background:#eef5ff;
-    color:#0b3558;
+    background:#f7f3e5;
+    color:#151515;
     font-size:22px;
     cursor:pointer;
     transition:.2s;
@@ -1362,7 +1407,7 @@ onMounted(() => {
 
 .detalhes-resumo strong {
   font-size: 22px;
-  color: #0b3558;
+  color: #151515;
 }
 
 .acoes button,
@@ -1471,8 +1516,8 @@ onMounted(() => {
 }
 
 .badge.quitado {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #f2e9cb;
+  color: #7f6114;
 }
 
 .item-venda {
@@ -1528,7 +1573,7 @@ onMounted(() => {
 .field label{
     font-size:14px;
     font-weight:600;
-    color:#234c70;
+    color:#2d2b26;
 }
 
 .field input,
@@ -1543,7 +1588,7 @@ onMounted(() => {
     font-size:15px;
     font-family:inherit;
     background:#fff;
-    color:#0b3558;
+    color:#151515;
 
     transition:.2s;
     box-sizing:border-box;
@@ -1558,8 +1603,8 @@ onMounted(() => {
 .field select:focus,
 .field textarea:focus{
     outline:none;
-    border-color:#4b8eb8;
-    box-shadow:0 0 0 3px rgba(75,142,184,.15);
+    border-color:#292720;
+    box-shadow:0 0 0 3px rgba(253,181,46,.15);
 }
 
 .saldo-info{
@@ -1567,7 +1612,7 @@ onMounted(() => {
     padding:18px 20px;
 
     background:#edf5fb;
-    border-left:5px solid #4b8eb8;
+    border-left:5px solid #292720;
     border-radius:14px;
 }
 
@@ -1581,7 +1626,7 @@ onMounted(() => {
 .saldo-info strong{
     display:block;
     font-size:30px;
-    color:#0b3558;
+    color:#151515;
     font-weight:700;
 }
 
@@ -1593,7 +1638,7 @@ onMounted(() => {
     border:none;
     border-radius:12px;
 
-    background:#4b8eb8;
+    background:#292720;
     color:#fff;
 
     font-size:15px;
@@ -1604,7 +1649,7 @@ onMounted(() => {
 }
 
 .btn-finalizar:hover:not(:disabled){
-    background:#3a7da6;
+    background:#403922;
 }
 
 .btn-finalizar:disabled{
@@ -1637,7 +1682,7 @@ onMounted(() => {
 }
 
 .busca input:focus{
-  border-color:#2563eb;
+  border-color:#9a7618;
   outline:none;
   box-shadow:0 0 0 3px rgba(37,99,235,.15);
 }
@@ -1663,7 +1708,7 @@ onMounted(() => {
 }
 
 .filtros .ativo{
-  background:#2563eb;
+  background:#9a7618;
   color:white;
 }
 
@@ -1680,8 +1725,8 @@ onMounted(() => {
     border:none;
     border-radius:50%;
 
-    background:#eef5ff;
-    color:#0b3558;
+    background:#f7f3e5;
+    color:#151515;
 
     font-size:20px;
     font-weight:bold;
@@ -1691,14 +1736,14 @@ onMounted(() => {
 }
 
 .btn-menu:hover{
-    background:#dbeafe;
+    background:#f2e9cb;
 }
 
 .venda-observacao {
   margin: 8px 0 12px;
   padding: 8px 12px;
   background: #f8fafc;
-  border-left: 4px solid #3b82f6;
+  border-left: 4px solid #b58d28;
   border-radius: 6px;
   font-size: 0.9rem;
   color: #475569;
@@ -1736,13 +1781,13 @@ onMounted(() => {
     border:none;
     border-radius:10px;
     background:#eef4ff;
-    color:#1e3a8a;
+    color:#5a4511;
     cursor:pointer;
     font-weight:600;
 }
 
 .tabs button.active{
-    background:#2563eb;
+    background:#9a7618;
     color:#fff;
 }
 
@@ -1789,6 +1834,11 @@ onMounted(() => {
   .cards-resumo,
   .pessoa-card {
     grid-template-columns: 1fr;
+  }
+
+  .lucro-evento {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

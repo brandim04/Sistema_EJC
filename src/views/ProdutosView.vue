@@ -1,9 +1,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { useToast } from 'vue-toastification'
+import { useAuthStore } from '../stores/auth'
 
 const toast = useToast()
+const auth = useAuthStore()
+const podeVerCusto = computed(() => auth.usuario?.perfil === 'ADMIN')
 
 const produtos = ref([])
 const pesquisa = ref('')
@@ -26,6 +30,7 @@ const form = ref({
   nome: '',
   categoria: '',
   preco: '',
+  preco_custo: '',
   estoque: ''
 })
 
@@ -35,6 +40,7 @@ const formEditar = ref({
   nome: '',
   categoria: '',
   preco: '',
+  preco_custo: '',
   estoque: ''
 })
 
@@ -56,20 +62,20 @@ const produtosFiltrados = computed(() => {
 
 async function carregarProdutos() {
 
-  const { data, error } = await supabase
+  try {
+    produtos.value = await fetchAllRows(supabase
     .from('produtos')
-    .select('*')
-    .order('codigo')
-
-  if (error) {
-
+    .select('id, codigo, nome, categoria, preco, estoque, ativo')
+    .order('codigo'))
+    if (podeVerCusto.value) {
+      const custos = await fetchAllRows(supabase.rpc('listar_custos_produtos'), 1000, 'produto_id')
+      const custosPorId = new Map((custos || []).map(item => [String(item.produto_id), Number(item.preco_custo)]))
+      produtos.value = produtos.value.map(produto => ({ ...produto, preco_custo: custosPorId.get(String(produto.id)) ?? null }))
+    }
+  } catch (error) {
     console.error(error)
     toast.error('Erro ao carregar produtos')
-
-    return
   }
-
-  produtos.value = data || []
 
 }
 
@@ -78,7 +84,8 @@ async function salvarProduto() {
   if (
     !form.value.nome ||
     !form.value.preco ||
-    form.value.estoque === ''
+    form.value.estoque === '' ||
+    (podeVerCusto.value && form.value.preco_custo === '')
   ) {
 
     toast.warning('Preencha todos os campos.')
@@ -86,7 +93,7 @@ async function salvarProduto() {
     return
   }
 
-  const { error } = await supabase
+  const { data: produtoCriado, error } = await supabase
 
     .from('produtos')
 
@@ -98,9 +105,12 @@ async function salvarProduto() {
 
       preco: Number(form.value.preco),
 
-      estoque: Number(form.value.estoque)
+      estoque: Number(form.value.estoque),
+      ativo: true
 
     })
+    .select('id')
+    .single()
 
   if (error) {
 
@@ -110,6 +120,21 @@ async function salvarProduto() {
 
     return
 
+  }
+
+  if (podeVerCusto.value) {
+    const { error: erroCusto } = await supabase.rpc('definir_custo_produto', {
+      p_produto_id: produtoCriado.id,
+      p_preco_custo: Number(form.value.preco_custo)
+    })
+    if (erroCusto) {
+      console.error(erroCusto)
+      toast.error('Produto criado, mas não foi possível salvar o custo. Revise a migração SQL.')
+      modalCadastro.value = false
+      limparFormulario()
+      await carregarProdutos()
+      return
+    }
   }
 
   toast.success('Produto cadastrado!')
@@ -135,6 +160,7 @@ function editarProduto(produto){
     categoria: produto.categoria,
 
     preco: produto.preco,
+    preco_custo: produto.preco_custo ?? '',
 
     estoque: produto.estoque
 
@@ -172,6 +198,19 @@ async function atualizarProduto(){
 
     return
 
+  }
+
+  if (podeVerCusto.value) {
+    const { error: erroCusto } = await supabase.rpc('definir_custo_produto', {
+      p_produto_id: formEditar.value.id,
+      p_preco_custo: formEditar.value.preco_custo === '' ? null : Number(formEditar.value.preco_custo)
+    })
+    if (erroCusto) {
+      console.error(erroCusto)
+      toast.error('Produto atualizado, mas não foi possível salvar o custo. Revise a migração SQL.')
+      await carregarProdutos()
+      return
+    }
   }
 
   toast.success('Produto atualizado.')
@@ -227,6 +266,8 @@ function limparFormulario(){
     categoria:'Bebidas',
 
     preco:'',
+
+    preco_custo:'',
 
     estoque:''
 
@@ -305,6 +346,7 @@ onMounted(()=>{
 
             <th>Preço</th>
 
+            <th v-if="podeVerCusto">Custo / lucro</th>
             <th>Estoque</th>
 
             <th width="180">Ações</th>
@@ -355,6 +397,11 @@ onMounted(()=>{
 
             </td>
 
+            <td v-if="podeVerCusto">
+              <div>{{ produto.preco_custo == null ? 'Sem custo cadastrado' : `${formatarMoeda(produto.preco_custo)} custo` }}</div>
+              <small>Lucro unitário: {{ produto.preco_custo == null ? '—' : formatarMoeda(Number(produto.preco) - Number(produto.preco_custo)) }}</small>
+            </td>
+
             <td>
 
               <span
@@ -399,7 +446,7 @@ onMounted(()=>{
           <tr v-if="produtosFiltrados.length === 0">
 
             <td
-              colspan="6"
+              :colspan="podeVerCusto ? 7 : 6"
               class="empty"
             >
 
@@ -482,6 +529,12 @@ onMounted(()=>{
               v-model="form.preco"
             >
 
+          </div>
+
+          <div v-if="podeVerCusto" class="field">
+            <label>Preço de custo</label>
+            <input v-model="form.preco_custo" type="number" min="0" step="0.01">
+            <small>Lucro unitário: {{ form.preco_custo === '' ? 'Informe o custo' : formatarMoeda(Number(form.preco || 0) - Number(form.preco_custo)) }}</small>
           </div>
 
           <div class="field">
@@ -604,6 +657,12 @@ onMounted(()=>{
 
           </div>
 
+          <div v-if="podeVerCusto" class="field">
+            <label>Preço de custo</label>
+            <input v-model="formEditar.preco_custo" type="number" min="0" step="0.01">
+            <small>Lucro unitário: {{ formEditar.preco_custo === '' ? 'Sem custo cadastrado' : formatarMoeda(Number(formEditar.preco || 0) - Number(formEditar.preco_custo)) }}</small>
+          </div>
+
           <div class="field">
 
             <label>Estoque</label>
@@ -710,7 +769,7 @@ onMounted(()=>{
 .page-header h1{
     margin:0;
     font-size:32px;
-    color:#0b3558;
+    color:#151515;
 }
 
 .page-header p{
@@ -723,7 +782,7 @@ onMounted(()=>{
     border-radius:18px;
     padding:22px;
     border:1px solid #e2edf5;
-    box-shadow:0 8px 22px rgba(11,53,88,.06);
+    box-shadow:0 8px 22px rgba(0,0,0,.06);
 }
 
 .table-header{
@@ -741,7 +800,7 @@ onMounted(()=>{
 }
 
 .search:focus{
-    border-color:#0b3558;
+    border-color:#151515;
 }
 
 table{
@@ -750,8 +809,8 @@ table{
 }
 
 th{
-    background:#eef6fb;
-    color:#0b3558;
+    background:#f6f2e8;
+    color:#151515;
     padding:14px;
     text-align:left;
     font-size:14px;
@@ -764,8 +823,8 @@ td{
 }
 
 .codigo{
-    background:#eef6fb;
-    color:#0b3558;
+    background:#f6f2e8;
+    color:#151515;
     padding:6px 12px;
     border-radius:999px;
     font-weight:700;
@@ -773,8 +832,8 @@ td{
 }
 
 .estoque{
-    background:#eef6fb;
-    color:#0b3558;
+    background:#f6f2e8;
+    color:#151515;
     padding:6px 12px;
     border-radius:999px;
     font-weight:700;
@@ -798,7 +857,7 @@ td{
 
 .categoria.bebidas{
     background:#dbeeff;
-    color:#1565c0;
+    color:#916b16;
 }
 
 .categoria.lanches{
@@ -825,7 +884,7 @@ button{
 
 .btn-primary{
 
-    background:#0b3558;
+    background:#151515;
     color:white;
     padding:11px 18px;
     border-radius:10px;
@@ -834,14 +893,14 @@ button{
 
 .btn-primary:hover{
 
-    background:#0e4b7d;
+    background:#2c281c;
 
 }
 
 .btn-secondary{
 
-    background:#eef6fb;
-    color:#0b3558;
+    background:#f6f2e8;
+    color:#151515;
     padding:10px 16px;
     border-radius:10px;
 
@@ -921,7 +980,7 @@ button{
 
     margin:0;
 
-    color:#0b3558;
+    color:#151515;
 
 }
 
@@ -929,7 +988,7 @@ button{
 
     background:none;
 
-    color:#0b3558;
+    color:#151515;
 
     font-size:28px;
 
@@ -959,7 +1018,7 @@ button{
 
 .field label{
 
-    color:#0b3558;
+    color:#151515;
 
     font-weight:600;
 
@@ -985,7 +1044,7 @@ button{
 .field input:focus,
 .field select:focus{
 
-    border-color:#0b3558;
+    border-color:#151515;
 
 }
 

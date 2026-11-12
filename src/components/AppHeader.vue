@@ -55,17 +55,13 @@ onUnmounted(() => {
 
       <div class="brand">
 
-        <!-- depois colocaremos a logo -->
         <div class="logo-circle">
-            <img
-                src="/img/logo-ejc.png"
-                alt="Logo EJC"
-            >
+          <img src="/img/xi-ejc-pss.png" alt="Marca XI EJC PSS">
         </div>
 
         <div class="brand-text">
-          <h1>Sistema EJC</h1>
-          <span>Gestão do Encontro de Jovens com Cristo</span>
+          <h1>XI EJC PSS</h1>
+          <span>Faz do meu não um EIS-ME aqui!</span>
         </div>
 
       </div>
@@ -159,7 +155,7 @@ onUnmounted(() => {
 
   background:#f2f5f9;
 
-  color:#0b3558;
+  color:#151515;
 
   font-size:22px;
 
@@ -169,7 +165,7 @@ onUnmounted(() => {
 }
 
 .menu-button:hover{
-  background:#0b3558;
+  background:#151515;
   color:white;
 }
 
@@ -186,7 +182,7 @@ onUnmounted(() => {
 
   border-radius:50%;
 
-  background:white;
+  background:#111;
 
   display:flex;
   align-items:center;
@@ -198,15 +194,15 @@ onUnmounted(() => {
 }
 
 .logo-circle img{
-  width:42px;
-  height:42px;
+  width:50px;
+  height:50px;
   object-fit:contain;
 }
 
 .brand-text h1{
   margin:0;
 
-  color:#0b3558;
+  color:#151515;
 
   font-size:21px;
 
@@ -264,7 +260,7 @@ onUnmounted(() => {
 
   border-radius:50%;
 
-  background:linear-gradient(135deg,#3f84ad,#0b3558);
+  background:linear-gradient(135deg,#292720,#151515);
 
   color:white;
 

@@ -1,16 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
 
 :root{
-  --azul-claro:#9ecce5;
-  --azul-medio:#5f9fc4;
-  --azul-escuro:#0b3558;
-  --azul-profundo:#062f52;
-  --dourado:#d6b35f;
+  --preto:#111111;
+  --preto-suave:#1c1b19;
+  --dourado:#fdb52e;
+  --dourado-claro:#ead99c;
 
-  --fundo:#eef3f8;
+  --fundo:#f4f2ec;
   --branco:#ffffff;
-  --texto:#183b56;
-  --borda:#d9e6ef;
+  --texto:#242321;
+  --borda:#e2dccd;
 }
 
 *{
@@ -31,6 +30,11 @@ body{
   background:var(--fundo);
   color:var(--texto);
   overflow:hidden;
+}
+
+:focus-visible{
+  outline:3px solid var(--dourado);
+  outline-offset:2px;
 }
 
 a{
@@ -61,10 +65,10 @@ img{
 }
 
 ::-webkit-scrollbar-thumb{
-  background:#b7cada;
+  background:#c4bca8;
   border-radius:999px;
 }
 
 ::-webkit-scrollbar-thumb:hover{
-  background:#93b3ca;
+  background:#a78b3d;
 }

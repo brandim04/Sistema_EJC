@@ -1,5 +1,6 @@
 <script setup>
 import { supabase } from '../lib/supabase'
+import { fetchAllRows } from '../lib/supabasePagination'
 import { useToast } from 'vue-toastification'
 import { ref, computed, watch, onMounted } from 'vue'
 const toast = useToast()
@@ -28,16 +29,20 @@ const form = ref({
 })
 
 async function carregarCirculos() {
-  const { data, error } = await supabase
+  let data
+  let loadError
+  try {
+    data = await fetchAllRows(supabase
     .from('circulos')
     .select('*')
-    .order('nome')
+    .order('nome'))
+  } catch (error) {
+    data = null
+    loadError = error
+  }
 
-  console.log('CIRCULOS:', data)
-  console.log('ERRO CIRCULOS:', error)
-
-  if (error) {
-    console.error(error)
+  if (loadError) {
+    console.error(loadError)
     toast.error('Erro ao carregar círculos.')
     return
   }
@@ -46,23 +51,26 @@ async function carregarCirculos() {
 }
 
 async function carregarEquipes() {
-  const { data, error } = await supabase
+  let data
+  try {
+    data = await fetchAllRows(supabase
     .from('equipes')
     .select('*')
-    .order('nome')
-
-  if (error) {
+    .order('nome'))
+  } catch (error) {
     console.error(error)
     toast.error('Erro ao carregar equipes.')
     return
   }
 
-  equipes.value = data || []
+  equipes.value = data
 }
 
 async function carregarPessoas() {
 
-  const { data, error } = await supabase
+  let data
+  try {
+    data = await fetchAllRows(supabase
     .from('pessoas')
     .select(`
       *,
@@ -75,15 +83,14 @@ async function carregarPessoas() {
         nome
       )
     `)
-    .order('nome')
-
-  if (error) {
+    .order('nome'))
+  } catch (error) {
     console.error(error)
     toast.error('Erro ao carregar pessoas.')
     return
   }
 
-  pessoas.value = data || []
+  pessoas.value = data
 }
 
 const pessoasFiltradas = computed(() => {
@@ -1090,7 +1097,7 @@ function proximaPagina() {
     margin:0;
     font-size:32px;
     font-weight:700;
-    color:#163b63;
+    color:#1c1b19;
 }
 
 .page-header p{
@@ -1105,7 +1112,7 @@ function proximaPagina() {
 
 .btn-primary{
     border:none;
-    background:#163b63;
+    background:#1c1b19;
     color:#fff;
     padding:14px 24px;
     border-radius:10px;
@@ -1116,14 +1123,14 @@ function proximaPagina() {
 }
 
 .btn-primary:hover{
-    background:#20558d;
+    background:#39321e;
     transform:translateY(-1px);
 }
 
 .btn-secondary{
     border:none;
     background:#edf1f5;
-    color:#163b63;
+    color:#1c1b19;
     padding:14px 22px;
     border-radius:10px;
     font-size:15px;
@@ -1162,7 +1169,7 @@ function proximaPagina() {
 .card-info strong{
     margin-top:10px;
     font-size:34px;
-    color:#163b63;
+    color:#1c1b19;
 }
 
 /* ==========================================
@@ -1199,8 +1206,8 @@ function proximaPagina() {
 
 .search:focus{
     outline:none;
-    border-color:#163b63;
-    box-shadow:0 0 0 3px rgba(22,59,99,.10);
+    border-color:#1c1b19;
+    box-shadow:0 0 0 3px rgba(0,0,0,.10);
 }
 
 /* ==========================================
@@ -1218,7 +1225,7 @@ table{
 }
 
 thead tr{
-    background:#163b63;
+    background:#1c1b19;
 }
 
 th{
@@ -1246,7 +1253,7 @@ tbody tr:hover{
 
 .nome{
     font-weight:600;
-    color:#163b63;
+    color:#1c1b19;
 }
 
 .empty{
@@ -1271,8 +1278,8 @@ tbody tr:hover{
 }
 
 .badge-jovem{
-    background:#e7f1ff;
-    color:#1d64d6;
+    background:#f5eed3;
+    color:#916b16;
 }
 
 .badge-servo{
@@ -1360,7 +1367,7 @@ tbody tr:hover{
 .modal-header h2{
     margin:0;
     font-size:28px;
-    color:#163b63;
+    color:#1c1b19;
 }
 
 .modal-header p{
@@ -1374,8 +1381,8 @@ tbody tr:hover{
     height:42px;
     border:none;
     border-radius:50%;
-    background:#eef3f8;
-    color:#163b63;
+    background:#f4f2ec;
+    color:#1c1b19;
     font-size:24px;
     cursor:pointer;
     transition:.25s;
@@ -1383,7 +1390,7 @@ tbody tr:hover{
 }
 
 .btn-close:hover{
-    background:#163b63;
+    background:#1c1b19;
     color:#fff;
     transform:rotate(90deg);
 }
@@ -1410,7 +1417,7 @@ tbody tr:hover{
 
 .field label{
     margin-bottom:8px;
-    color:#163b63;
+    color:#1c1b19;
     font-weight:600;
     font-size:14px;
 }
@@ -1437,8 +1444,8 @@ tbody tr:hover{
 .field select:focus,
 .field textarea:focus{
     outline:none;
-    border-color:#163b63;
-    box-shadow:0 0 0 3px rgba(22,59,99,.12);
+    border-color:#1c1b19;
+    box-shadow:0 0 0 3px rgba(0,0,0,.12);
 }
 
 /* ==========================================
@@ -1517,7 +1524,7 @@ tbody tr:hover{
     padding:0 18px;
     border:none;
     border-radius:12px;
-    background:#163b63;
+    background:#1c1b19;
     color:#fff;
     font-size:14px;
     font-weight:600;
@@ -1526,7 +1533,7 @@ tbody tr:hover{
 }
 
 .btn-filtro:hover{
-    background:#1d4f84;
+    background:#5a4715;
 }
 
 .dropdown-menu{
@@ -1553,7 +1560,7 @@ tbody tr:hover{
 .filtro-grupo h4{
     margin:0 0 8px;
     font-size:13px;
-    color:#163b63;
+    color:#1c1b19;
     text-transform:uppercase;
     letter-spacing:.6px;
 }
@@ -1592,7 +1599,7 @@ tbody tr:hover{
     width:100%;
     border:none;
     border-radius:10px;
-    background:#163b63;
+    background:#1c1b19;
     color:#fff;
     padding:10px;
     font-weight:600;
@@ -1601,7 +1608,7 @@ tbody tr:hover{
 }
 
 .btn-limpar:hover{
-    background:#1d4f84;
+    background:#5a4715;
 }
 
 /* ==========================================
@@ -1814,7 +1821,7 @@ tbody tr:hover{
     padding:0 18px;
 
     background:#ffffff;
-    color:#163b63;
+    color:#1c1b19;
 
     border:1px solid #d5dce5;
     border-radius:12px;
@@ -1828,7 +1835,7 @@ tbody tr:hover{
 
 .btn-filtro:hover{
     background:#f7f9fc;
-    border-color:#163b63;
+    border-color:#1c1b19;
 }
 
 .btn-filtro:hover {
