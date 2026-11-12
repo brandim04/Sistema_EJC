@@ -64,6 +64,8 @@ async function entrar() {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
+  box-sizing: border-box;
+  overflow-x: clip;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -73,6 +75,7 @@ async function entrar() {
 
 .login-card {
   width: min(100%, 380px);
+  box-sizing: border-box;
   padding: 30px;
   display: flex;
   flex-direction: column;
@@ -99,6 +102,7 @@ h1 {
 
 .login-form {
   width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 13px;
@@ -106,6 +110,9 @@ h1 {
 
 .login-form input {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 46px;
   padding: 12px 14px;
   border: 1px solid #dedbd2;
@@ -120,6 +127,10 @@ h1 {
 }
 
 .login-form button {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 46px;
   padding: 12px;
   border: 1px solid #fdb52e;
@@ -142,12 +153,33 @@ h1 {
 
 @media (max-width: 480px) {
   .login-container {
-    padding: 16px;
+    width: 100%;
+    min-height: 100svh;
+    min-height: 100dvh;
+    padding: 16px 0;
+    overflow-x: hidden;
   }
 
   .login-card {
-    padding: 26px 22px;
-    gap: 16px;
+    width: calc(100% - 32px);
+    max-width: 420px;
+    padding: 24px;
+    gap: 10px;
+  }
+
+  .login-mark {
+    width: 100px;
+    height: 100px;
+  }
+
+  h1 {
+    margin: 4px 0;
+    font-size: 26px;
+  }
+
+  .login-form {
+    gap: 10px;
   }
 }
+
 </style>
