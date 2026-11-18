@@ -1,8 +1,10 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { fetchAllRows } from '../lib/supabasePagination'
 import { useToast } from 'vue-toastification'
+import QRCode from 'qrcode'
+import { gerarPayloadPix } from '../lib/pix'
 
 const toast = useToast()
 
@@ -42,13 +44,21 @@ const trocoCalculado = ref(null)
 const qrCodeUrl = ref('')
 const pixCopiaCola = ref('')
 const modalPixAberto = ref(false)
+const pixPagamentoConfirmado = ref(false)
+const gerandoPix = ref(false)
 
 const modalPessoaAberto = ref(false)
 const modalSelecionarPessoaAberto = ref(false)
 
-const chavePix = 'COLOQUE_A_CHAVE_PIX_AQUI'
-const nomeRecebedorPix = 'EJC PNSG'
-const cidadePix = 'TIMON'
+const chavePix = 'c1447344-7e06-45e5-80a8-34a097f772e6'
+const nomeRecebedorPix = 'Vinícius Vieira Rodrigues'
+const instituicaoPix = 'Stone IP S.A.'
+const cidadePix = 'Teresina'
+
+watch(
+  [statusPagamento, formaPagamento, () => carrinho.value.map(item => `${item.id}:${item.quantidade}:${item.preco}`).join('|')],
+  () => { pixPagamentoConfirmado.value = false }
+)
 
 const circulos = [
   'Lilás',
@@ -348,6 +358,77 @@ function limparVenda() {
   trocoCalculado.value = null
   qrCodeUrl.value = ''
   pixCopiaCola.value = ''
+  modalPixAberto.value = false
+  pixPagamentoConfirmado.value = false
+}
+
+async function abrirModalPix() {
+  if (gerandoPix.value) return
+
+  try {
+    gerandoPix.value = true
+    const payload = gerarPayloadPix({
+      chave: chavePix,
+      recebedor: nomeRecebedorPix,
+      cidade: cidadePix,
+      valor: totalCarrinho.value
+    })
+    const imagem = await QRCode.toDataURL(payload, {
+      errorCorrectionLevel: 'M',
+      margin: 4,
+      width: 320
+    })
+
+    pixCopiaCola.value = payload
+    qrCodeUrl.value = imagem
+    modalPixAberto.value = true
+  } catch (error) {
+    console.error(error)
+    erro(error.message || 'Não foi possível gerar o QR Code Pix.')
+  } finally {
+    gerandoPix.value = false
+  }
+}
+
+function fecharModalPix() {
+  modalPixAberto.value = false
+}
+
+async function copiarPix() {
+  if (!pixCopiaCola.value) return
+
+  try {
+    let copiado = false
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(pixCopiaCola.value)
+        copiado = true
+      } catch (error) {
+        console.warn('Clipboard API indisponível; tentando cópia alternativa.', error)
+      }
+    }
+
+    if (!copiado) {
+      const campoTemporario = document.createElement('textarea')
+      campoTemporario.value = pixCopiaCola.value
+      campoTemporario.setAttribute('readonly', '')
+      campoTemporario.style.position = 'fixed'
+      campoTemporario.style.opacity = '0'
+      document.body.appendChild(campoTemporario)
+      try {
+        campoTemporario.select()
+        copiado = document.execCommand('copy')
+      } finally {
+        campoTemporario.remove()
+      }
+    }
+
+    if (!copiado) throw new Error('Não foi possível copiar o código Pix.')
+    sucesso('Código Pix copiado.')
+  } catch (error) {
+    console.error(error)
+    erro('Não foi possível copiar. Selecione e copie o código Pix manualmente.')
+  }
 }
 
 async function finalizarVenda() {
@@ -364,6 +445,13 @@ async function finalizarVenda() {
 
   if (statusPagamento.value === 'Pago' && !formaPagamento.value) {
     aviso('Informe a forma de pagamento')
+    return
+  }
+
+  if (statusPagamento.value === 'Pago' && formaPagamento.value === 'Pix' && !pixPagamentoConfirmado.value) {
+    aviso('A geração do QR Code não confirma o pagamento. Verifique o recebimento e confirme no modal antes de finalizar.')
+    if (!pixCopiaCola.value) await abrirModalPix()
+    else modalPixAberto.value = true
     return
   }
 
@@ -691,6 +779,17 @@ onMounted(() => {
               </label>
           </div>
 
+          <div v-if="statusPagamento === 'Pago' && formaPagamento === 'Pix'" class="pix-actions">
+            <button
+              class="btn-secondary"
+              type="button"
+              :disabled="gerandoPix || carrinho.length === 0"
+              @click="abrirModalPix"
+            >
+              {{ gerandoPix ? 'Gerando QR Code...' : 'Gerar QR Code Pix' }}
+            </button>
+          </div>
+
           <label class="radio-option">
             <input
               v-model="statusPagamento"
@@ -852,20 +951,29 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="modalPixAberto" class="modal-overlay">
-      <div class="modal pix-modal">
+    <div
+      v-if="modalPixAberto"
+      class="modal-overlay"
+      @click.self="fecharModalPix"
+      @keydown.esc.window="fecharModalPix"
+    >
+      <div class="modal pix-modal" role="dialog" aria-modal="true" aria-labelledby="titulo-pix">
         <div class="modal-header">
-          <h2>QR Code Pix</h2>
+          <h2 id="titulo-pix">QR Code Pix</h2>
 
           <button
             class="btn-close"
-            @click="modalPixAberto = false"
+            type="button"
+            aria-label="Fechar QR Code Pix"
+            @click="fecharModalPix"
           >
-            ×
+            X
           </button>
         </div>
 
         <div class="pix-content">
+          <p>Recebedor: {{ nomeRecebedorPix }}</p>
+          <p>Instituição: {{ instituicaoPix }}</p>
           <p>Total do Pix:</p>
           <strong>{{ formatarMoeda(totalCarrinho) }}</strong>
 
@@ -879,11 +987,18 @@ onMounted(() => {
           <textarea
             v-model="pixCopiaCola"
             readonly
+            aria-label="Código Pix copia e cola"
           ></textarea>
 
-          <button @click="copiarPix">
+          <button type="button" @click="copiarPix">
             Copiar Pix
           </button>
+
+          <label class="pix-confirmacao">
+            <input v-model="pixPagamentoConfirmado" type="checkbox">
+            Já verifiquei o crédito no aplicativo bancário.
+          </label>
+          <small class="pix-aviso">Gerar ou copiar o QR Code não confirma o pagamento.</small>
         </div>
       </div>
     </div>
@@ -1423,7 +1538,11 @@ textarea {
 }
 
 .pix-modal {
+  width: min(500px, calc(100vw - 24px));
   max-width: 500px;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .pix-content {
@@ -1434,8 +1553,9 @@ textarea {
 }
 
 .qr-code {
-  width: 250px;
-  height: 250px;
+  width: min(250px, 70vw);
+  height: auto;
+  aspect-ratio: 1;
   object-fit: contain;
   border: 1px solid #e3edf4;
   border-radius: 12px;
@@ -1444,7 +1564,58 @@ textarea {
 }
 
 .pix-content textarea {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   min-height: 90px;
+}
+
+.pix-confirmacao {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  color: #292720;
+  font-size: 14px;
+  text-align: left;
+}
+
+.pix-confirmacao input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.pix-aviso {
+  width: 100%;
+  color: #67521d;
+  text-align: left;
+}
+
+.pix-actions button {
+  width: 100%;
+}
+
+@media (max-width: 480px) {
+  .pix-modal {
+    width: calc(100vw - 24px);
+    max-width: none;
+    max-height: calc(100svh - 24px);
+    padding: 18px;
+  }
+
+  .pix-modal .modal-header {
+    position: sticky;
+    top: -18px;
+    z-index: 1;
+    padding-top: 8px;
+    background: #fff;
+  }
+
+  .pix-modal .btn-close {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+  }
 }
 
 textarea{

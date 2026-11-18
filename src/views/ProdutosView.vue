@@ -81,11 +81,15 @@ async function carregarProdutos() {
 
 async function salvarProduto() {
 
+  if (!validarPrecoCusto(form.value.preco_custo)) {
+    toast.warning('O preço de custo deve ser numérico e igual ou maior que zero.')
+    return
+  }
+
   if (
     !form.value.nome ||
     !form.value.preco ||
-    form.value.estoque === '' ||
-    (podeVerCusto.value && form.value.preco_custo === '')
+    form.value.estoque === ''
   ) {
 
     toast.warning('Preencha todos os campos.')
@@ -122,7 +126,7 @@ async function salvarProduto() {
 
   }
 
-  if (podeVerCusto.value) {
+  if (podeVerCusto.value && form.value.preco_custo !== '') {
     const { error: erroCusto } = await supabase.rpc('definir_custo_produto', {
       p_produto_id: produtoCriado.id,
       p_preco_custo: Number(form.value.preco_custo)
@@ -171,6 +175,11 @@ function editarProduto(produto){
 }
 
 async function atualizarProduto(){
+
+  if (!validarPrecoCusto(formEditar.value.preco_custo)) {
+    toast.warning('O preço de custo deve ser numérico e igual ou maior que zero.')
+    return
+  }
 
   const { error } = await supabase
 
@@ -273,6 +282,12 @@ function limparFormulario(){
 
   }
 
+}
+
+function validarPrecoCusto(valor) {
+  if (valor === '' || valor === null || valor === undefined) return true
+  const custo = Number(valor)
+  return Number.isFinite(custo) && custo >= 0
 }
 
 function formatarCodigo(codigo){
@@ -534,7 +549,7 @@ onMounted(()=>{
           <div v-if="podeVerCusto" class="field">
             <label>Preço de custo</label>
             <input v-model="form.preco_custo" type="number" min="0" step="0.01">
-            <small>Lucro unitário: {{ form.preco_custo === '' ? 'Informe o custo' : formatarMoeda(Number(form.preco || 0) - Number(form.preco_custo)) }}</small>
+            <small>Lucro unitário: {{ form.preco_custo === '' ? 'Sem custo cadastrado' : formatarMoeda(Number(form.preco || 0) - Number(form.preco_custo)) }}</small>
           </div>
 
           <div class="field">

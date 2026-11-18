@@ -12,6 +12,7 @@ const modalExcluirVendaAberto = ref(false)
 const vendaSelecionada = ref(null)
 const excluindoVenda = ref(false)
 const lucroEvento = ref(null)
+const statusLucroEvento = ref('carregando')
 
 function obterVendasComStatus(pessoaId) {
   const vendasPessoa = vendas.value
@@ -246,9 +247,16 @@ vendas.value = vendasData
     if (error) {
       console.error(error)
       lucroEvento.value = null
+      statusLucroEvento.value = 'erro'
     } else {
       const resumo = Array.isArray(data) ? data[0] : data
-      lucroEvento.value = Number(resumo?.lucro_bruto || 0)
+      if (Number(resumo?.itens_sem_custo || 0) > 0) {
+        lucroEvento.value = null
+        statusLucroEvento.value = 'sem_custo'
+      } else {
+        lucroEvento.value = Number(resumo?.lucro_bruto || 0)
+        statusLucroEvento.value = 'disponivel'
+      }
     }
   }
 }
@@ -628,7 +636,11 @@ onMounted(() => {
 
     <section v-if="auth.usuario?.perfil === 'ADMIN'" class="card lucro-evento">
       <h2>Lucro do Evento</h2>
-      <strong>{{ lucroEvento === null ? '—' : formatarMoeda(lucroEvento) }}</strong>
+      <div class="lucro-evento-valor">
+        <strong>{{ lucroEvento === null ? '—' : formatarMoeda(lucroEvento) }}</strong>
+        <small v-if="statusLucroEvento === 'sem_custo'">Cadastre os custos dos produtos vendidos para calcular o lucro.</small>
+        <small v-else-if="statusLucroEvento === 'erro'">Não foi possível carregar o lucro agora.</small>
+      </div>
     </section>
 
     <section class="card">
@@ -1137,6 +1149,18 @@ onMounted(() => {
 .lucro-evento strong {
   color: #151515;
   font-size: 28px;
+}
+
+.lucro-evento-valor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.lucro-evento-valor small {
+  color: #67521d;
+  text-align: right;
 }
 
 .stats {
@@ -1839,6 +1863,14 @@ onMounted(() => {
   .lucro-evento {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .lucro-evento-valor {
+    align-items: flex-start;
+  }
+
+  .lucro-evento-valor small {
+    text-align: left;
   }
 }
 </style>
